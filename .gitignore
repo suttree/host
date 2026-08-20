@@ -1,0 +1,6 @@
+# Build output: the app bundle, the generated iconset, and the icon tool binary.
+# Resources/AppIcon.icns is committed on purpose -- the Makefile treats it as a
+# prerequisite, so a fresh clone can build without running `make icon` first.
+build/
+
+.DS_Store

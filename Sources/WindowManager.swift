@@ -1,0 +1,324 @@
+import Cocoa
+import ApplicationServices
+
+/// Result of trying to put an app's window into the workspace rect.
+struct PlacementResult {
+    let bundleID: String
+    let launched: Bool
+    let waitedForWindow: TimeInterval
+    let requested: CGRect      // AX coords
+    let actual: CGRect?        // AX coords, read back afterwards
+    let error: String?
+
+    /// How far the window ended up from where we asked, in points.
+    var drift: CGFloat? {
+        guard let a = actual else { return nil }
+        return max(abs(a.minX - requested.minX), abs(a.minY - requested.minY),
+                   abs(a.width - requested.width), abs(a.height - requested.height))
+    }
+}
+
+final class WindowManager {
+    static let shared = WindowManager()
+
+    /// All AX traffic goes here. AXUIElementCopyAttributeValue is a synchronous
+    /// IPC call into the target process; on the main thread an unresponsive app
+    /// would stall our UI for the full messaging timeout on every read.
+    private let queue = DispatchQueue(label: "host.ax", qos: .userInitiated)
+
+    /// Fired on the main thread when a tracked window is moved or resized by the
+    /// user, with the window's new frame in Cocoa coordinates. This is how the
+    /// strip follows a window the user drags or resizes by its own edges.
+    var onGeometryChange: ((String, CGRect) -> Void)?
+
+    private var geometryGeneration: UInt64 = 0
+    /// Geometry notifications caused by our own placement, which must not be read
+    /// back as user intent. Keyed by bundle id, on the AX queue.
+    private var suppressGeometryUntil: [String: Date] = [:]
+    private var trackedWindows: [String: AXUIElement] = [:]
+    private var appElements: [pid_t: AXUIElement] = [:]
+    private var observers: [pid_t: AXObserver] = [:]
+    /// The window we picked per app, so a second document window does not steal the tab.
+    private var boundWindows: [String: AXUIElement] = [:]
+
+    private init() {
+        axSetTimeout(AXUIElementCreateSystemWide())
+    }
+
+    // MARK: - Public API
+
+    /// Launch if needed, find the main window, move it into `cocoaRect`, raise it.
+    func place(bundleID: String, in cocoaRect: CGRect, completion: @escaping (PlacementResult) -> Void) {
+        let axRect = Coords.flip(cocoaRect)
+        queue.async {
+            let result = self.placeSync(bundleID: bundleID, axRect: axRect)
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    func forget(bundleID: String) {
+        queue.async { self.boundWindows[bundleID] = nil }
+    }
+
+    // MARK: - Implementation
+
+    private func placeSync(bundleID: String, axRect: CGRect) -> PlacementResult {
+        var launched = false
+
+        var running = Self.runningApp(bundleID)
+        if running == nil {
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+                return PlacementResult(bundleID: bundleID, launched: false, waitedForWindow: 0,
+                                       requested: axRect, actual: nil,
+                                       error: "no application installed with that bundle id")
+            }
+            Log.line("launching \(bundleID)")
+            launched = true
+            let sema = DispatchSemaphore(value: 0)
+            var launchError: String?
+            let config = NSWorkspace.OpenConfiguration()
+            // Must be true. Document-based apps commonly create no window at all
+            // when launched without activation -- TextEdit launches, reports zero
+            // AX windows forever, and the tab simply never appears. We raise the
+            // window immediately afterwards anyway, so nothing is gained by
+            // launching quietly.
+            config.activates = true
+            config.addsToRecentItems = false
+            NSWorkspace.shared.openApplication(at: url, configuration: config) { app, error in
+                if let error { launchError = error.localizedDescription }
+                running = app
+                sema.signal()
+            }
+            if sema.wait(timeout: .now() + 20) == .timedOut {
+                return PlacementResult(bundleID: bundleID, launched: true, waitedForWindow: 0,
+                                       requested: axRect, actual: nil, error: "launch timed out")
+            }
+            if let launchError {
+                return PlacementResult(bundleID: bundleID, launched: true, waitedForWindow: 0,
+                                       requested: axRect, actual: nil, error: launchError)
+            }
+        }
+
+        guard let app = running else {
+            return PlacementResult(bundleID: bundleID, launched: launched, waitedForWindow: 0,
+                                   requested: axRect, actual: nil, error: "application not running")
+        }
+
+        // A hidden app reports no windows at all, so unhide before looking.
+        if app.isHidden { app.unhide() }
+
+        let appElement = self.appElement(for: app.processIdentifier)
+        self.installObserver(pid: app.processIdentifier, element: appElement, bundleID: bundleID)
+
+        let waitStart = Date()
+        var window = self.waitForWindow(bundleID: bundleID, appElement: appElement,
+                                        deadline: launched ? 12 : 3)
+        if window == nil {
+            // Reopening is the documented nudge for an app that is running but
+            // showing nothing: LaunchServices sends it a reopen event, which is
+            // what makes a document app produce an untitled document or its open
+            // panel.
+            Log.line("  \(bundleID): running but no window yet, nudging with a reopen")
+            axSetBool(appElement, kAXFrontmostAttribute as String, true)
+            self.reopen(bundleID)
+            window = self.waitForWindow(bundleID: bundleID, appElement: appElement, deadline: 8)
+        }
+        guard let window else {
+            for line in axDescribe(bundleID) { Log.line("  \(line)") }
+            return PlacementResult(bundleID: bundleID, launched: launched,
+                                   waitedForWindow: Date().timeIntervalSince(waitStart),
+                                   requested: axRect, actual: nil,
+                                   error: "no standard window appeared")
+        }
+        let waited = Date().timeIntervalSince(waitStart)
+        self.trackGeometry(pid: app.processIdentifier, bundleID: bundleID, window: window)
+
+        // A minimised window silently ignores position and size writes.
+        if axBool(window, kAXMinimizedAttribute as String) == true {
+            axSetBool(window, kAXMinimizedAttribute as String, false)
+            Thread.sleep(forTimeInterval: 0.15)   // the genie animation must finish first
+        }
+
+        // Our own resize is about to fire move/resize notifications. Without this
+        // an app that clamps to a minimum size would report its clamped frame,
+        // followWindow would treat that as the user resizing the workspace, and
+        // the size the user actually chose would be silently replaced by whatever
+        // the least flexible app in the workspace permits.
+        self.suppressGeometryUntil[bundleID] = Date().addingTimeInterval(1.0)
+        axSetFrame(window, axRect)
+
+        // Raise within the app, then bring the app forward. Doing it in this
+        // order avoids a frame where the wrong window of the target app is on top.
+        axSetBool(window, kAXMainAttribute as String, true)
+        AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        self.activate(app, appElement: appElement)
+
+        // Read back rather than trusting the write. Apps with size constraints,
+        // and full-screen or tiled windows, will quietly refuse.
+        let actual = axFrame(window)
+        if let actual, abs(actual.width - axRect.width) > 2 || abs(actual.height - axRect.height) > 2 {
+            Log.line("  \(bundleID) refused the workspace size " +
+                     "(wanted \(Int(axRect.width))x\(Int(axRect.height)), " +
+                     "took \(Int(actual.width))x\(Int(actual.height))) -- minimum size; workspace unchanged")
+        }
+        return PlacementResult(bundleID: bundleID, launched: launched, waitedForWindow: waited,
+                               requested: axRect, actual: actual, error: nil)
+    }
+
+    /// Bring an app to the front.
+    ///
+    /// NSRunningApplication.activate alone is not enough. Since macOS 14 an app
+    /// may only activate another app while it holds activation rights, and Host's
+    /// tab strip is a non-activating panel, so Host is almost never frontmost and
+    /// the request is simply refused. The window gets moved into place correctly
+    /// and then never comes forward -- which looks exactly like "the tab does
+    /// nothing".
+    ///
+    /// Setting AXFrontmost goes through the Accessibility API instead, which is
+    /// not subject to that restriction. Host already requires Accessibility to do
+    /// anything at all, so this costs nothing extra.
+    private func reopen(_ bundleID: String) {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        config.addsToRecentItems = false
+        let sema = DispatchSemaphore(value: 0)
+        NSWorkspace.shared.openApplication(at: url, configuration: config) { _, _ in sema.signal() }
+        _ = sema.wait(timeout: .now() + 10)
+    }
+
+    private func activate(_ app: NSRunningApplication, appElement: AXUIElement) {
+        axSetBool(appElement, kAXFrontmostAttribute as String, true)
+        if !app.activate(options: [.activateAllWindows]) {
+            Log.line("  NSRunningApplication.activate refused; AXFrontmost carried it")
+        }
+    }
+
+    /// Poll for a usable window. Polling rather than waiting on an AX notification
+    /// because a freshly launched process often has no AX application element yet,
+    /// so there is nothing to observe until it does.
+    private func waitForWindow(bundleID: String, appElement: AXUIElement, deadline: TimeInterval) -> AXUIElement? {
+        if let bound = boundWindows[bundleID], axFrame(bound) != nil {
+            return bound
+        }
+        let end = Date().addingTimeInterval(deadline)
+        repeat {
+            if let w = primaryWindow(of: appElement) {
+                boundWindows[bundleID] = w
+                return w
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        } while Date() < end
+        return nil
+    }
+
+    /// Which window is "the" window. Apps disagree about this, so try the
+    /// specific attributes first and only then fall back to scanning the list.
+    private func primaryWindow(of appElement: AXUIElement) -> AXUIElement? {
+        for attribute in [kAXMainWindowAttribute as String, kAXFocusedWindowAttribute as String] {
+            if let w = axElement(appElement, attribute), axIsStandardWindow(w) {
+                return w
+            }
+        }
+        return axElements(appElement, kAXWindowsAttribute as String).first(where: axIsStandardWindow)
+    }
+
+    private func appElement(for pid: pid_t) -> AXUIElement {
+        if let existing = appElements[pid] { return existing }
+        let element = AXUIElementCreateApplication(pid)
+        axSetTimeout(element)
+        appElements[pid] = element
+        return element
+    }
+
+    // MARK: - Observers
+    //
+    // Without these a tab breaks the moment the app opens a second document
+    // window or the user closes the one we bound to.
+
+    private func installObserver(pid: pid_t, element: AXUIElement, bundleID: String) {
+        guard observers[pid] == nil else { return }
+
+        var observer: AXObserver?
+        let callback: AXObserverCallback = { _, element, notification, refcon in
+            guard let refcon else { return }
+            let box = Unmanaged<ObserverBox>.fromOpaque(refcon).takeUnretainedValue()
+            let name = notification as String
+
+            // Handled first and without logging: a live drag fires these dozens
+            // of times a second and would drown the log.
+            if name == (kAXWindowMovedNotification as String)
+                || name == (kAXWindowResizedNotification as String) {
+                WindowManager.shared.geometryChanged(window: element, bundleID: box.bundleID)
+                return
+            }
+
+            Log.line("ax event \(box.bundleID): \(name)")
+            if name == (kAXUIElementDestroyedNotification as String)
+                || name == (kAXMainWindowChangedNotification as String) {
+                WindowManager.shared.forget(bundleID: box.bundleID)
+            }
+        }
+        guard AXObserverCreate(pid, callback, &observer) == .success, let observer else { return }
+
+        let box = ObserverBox(bundleID: bundleID)
+        boxes.append(box)
+        let refcon = Unmanaged.passUnretained(box).toOpaque()
+
+        for name in [kAXWindowCreatedNotification, kAXMainWindowChangedNotification,
+                     kAXUIElementDestroyedNotification] {
+            AXObserverAddNotification(observer, element, name as CFString, refcon)
+        }
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        observers[pid] = observer
+    }
+
+    private var boxes: [ObserverBox] = []
+
+    /// Subscribe to move/resize on the one window this tab is bound to.
+    private func trackGeometry(pid: pid_t, bundleID: String, window: AXUIElement) {
+        guard let observer = observers[pid] else { return }
+        if let existing = trackedWindows[bundleID], CFEqual(existing, window) { return }
+        if let existing = trackedWindows[bundleID] {
+            AXObserverRemoveNotification(observer, existing, kAXWindowMovedNotification as CFString)
+            AXObserverRemoveNotification(observer, existing, kAXWindowResizedNotification as CFString)
+        }
+        guard let box = boxes.first(where: { $0.bundleID == bundleID }) else { return }
+        let refcon = Unmanaged.passUnretained(box).toOpaque()
+        AXObserverAddNotification(observer, window, kAXWindowMovedNotification as CFString, refcon)
+        AXObserverAddNotification(observer, window, kAXWindowResizedNotification as CFString, refcon)
+        trackedWindows[bundleID] = window
+    }
+
+    /// Called on the main run loop by the AX observer.
+    ///
+    /// The frame read is pushed onto the AX queue like every other AX call, and
+    /// a generation counter drops results that a newer notification has already
+    /// superseded. Without that, a fast drag builds a backlog of stale frames and
+    /// the strip lags visibly behind the window.
+    fileprivate func geometryChanged(window: AXUIElement, bundleID: String) {
+        geometryGeneration &+= 1
+        let generation = geometryGeneration
+        queue.async {
+            if let until = self.suppressGeometryUntil[bundleID], Date() < until { return }
+            guard let axRect = axFrame(window) else { return }
+            DispatchQueue.main.async {
+                guard generation == self.geometryGeneration else { return }
+                self.onGeometryChange?(bundleID, Coords.flip(axRect))
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    static func runningApp(_ bundleID: String) -> NSRunningApplication? {
+        NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == bundleID }
+    }
+}
+
+/// AXObserverCallback is a bare C function pointer and cannot capture context,
+/// so identity is passed through the refcon instead.
+final class ObserverBox {
+    let bundleID: String
+    init(bundleID: String) { self.bundleID = bundleID }
+}

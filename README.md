@@ -1,0 +1,200 @@
+# Host — Phase 1 prototype
+
+Proof that the window-orchestration layer works. Not a tab switcher yet; a rig for
+finding out whether a tab switcher built this way would be any good.
+
+```bash
+make identity   # once — see "Accessibility" below
+make run        # builds, installs to /Applications, launches
+```
+
+Then grant Accessibility, click a tab, and run **Tabs › Run Self-test**.
+
+## What it does
+
+A floating, non-activating strip at the top of a workspace rectangle. Clicking a
+tab (or pressing `⌃1` / `⌃2`) launches the app if needed, finds its main window,
+moves it into the rectangle below the strip, and raises it.
+
+- `+` adds an app from `/Applications`, persisted to
+  `~/Library/Application Support/Host/workspace.json`. The new tab is selected
+  immediately, so the app launches and sizes itself to the workspace there and
+  then. Adding an app that is already a tab selects the existing one rather than
+  creating a second — tabs are keyed by bundle id throughout, so duplicates would
+  fight over the same bound window and geometry state.
+- Right-click a tab to remove it. The app keeps running and its window stays put
+  — removing a tab is forgetting about an app, not closing it
+- **Resizing or moving the hosted window drags the strip with it**: the strip
+  re-derives the workspace from the window and matches its width exactly
+- Dragging the strip moves the whole workspace, app window included
+- **Hiding any tab's app hides the whole workspace**, strip included. Unhiding one
+  brings the strip back but not the other four — unhiding one tab should not drag
+  everything else onto the screen with it.
+- Dock icon and a **Tabs** menu holding Add Application, Self-test, Show Log and
+  Accessibility Settings
+
+## The success criterion
+
+One app moving once proves nothing. Every failure mode lives in the *switch*:
+windows drifting a few points each time, the strip falling behind the app, focus
+bouncing, apps that quietly refuse to resize. So the self-test does ten switches
+and reports the worst drift. **Under ~2pt with no visible flicker means Phase 1
+is proved.** It has been run and it passes. Anything above that is an app clamping its own geometry, and the log
+prints requested vs. actual so you can see which.
+
+## Why `make run` installs to /Applications
+
+Because an Accessibility grant attaches to an app at a path LaunchServices knows
+about. A bundle sitting in `build/` has three problems: it is never registered, so
+it cannot appear in the Accessibility list at all; the System Settings `+` picker
+opens at `/Applications` and will not show it; and `make clean` deletes it,
+taking the grant with it. `make install` copies to `/Applications/Host.app` and
+registers it with `lsregister`. `make run` does that and then launches.
+
+If macOS shows Host as ticked but windows stop moving, `make reset-permission`
+clears the grant so the app prompts again on next launch.
+
+## Accessibility, and why `make identity` exists
+
+macOS keys TCC grants to the code signature. Ad-hoc signatures change on every
+build, so every rebuild silently revokes the grant — the app still shows as
+ticked in System Settings while every window call fails. That is the single most
+annoying thing about this kind of project.
+
+`make identity` creates a self-signed certificate in a dedicated keychain (no
+sudo, nothing touches your login keychain). The resulting designated requirement
+is:
+
+```
+identifier "com.suttree.host" and certificate leaf = H"e8878aef..."
+```
+
+No cdhash, so it is stable across rebuilds. Grant once.
+
+`security find-identity -v` will still not list it — `-v` means "chains to a
+trusted root", which a self-signed cert never does. `codesign` accepts it anyway.
+You also have an expired `Apple Development: Duncan Gough` cert in the login
+keychain; if you renew it, set `IDENTITY` in the Makefile to that instead.
+
+Note this app can never be sandboxed, because the Accessibility API requires an
+unsandboxed process. Developer ID and notarization only — no Mac App Store.
+
+## Decisions worth knowing about
+
+**There is no host window.** The plan called for an 800×600 window with a tab bar
+at the top and the app window filling the rest. But the external window is always
+drawn over anything we could put back there, so that window would be invisible —
+and it would sit in the z-order fighting the app it just raised. All that is
+actually needed is a rectangle and a floating strip. `Workspace` is the rectangle.
+
+**Control, not Command.** `⌘1`–`⌘9` are already spoken for in most apps. A
+switcher that fights the app it just brought forward is worse than no switcher.
+
+**Carbon `RegisterEventHotKey`, not `NSEvent.addGlobalMonitorForEvents`.** A
+global monitor can observe a keystroke but cannot consume it, so the frontmost app
+would receive it too. Carbon swallows the event and works from an accessory app
+that is never active.
+
+**All AX traffic is off the main thread.** `AXUIElementCopyAttributeValue` is
+synchronous IPC into the target process; on the main thread one beachballed app
+stalls the UI on every read. Everything runs on a serial queue with a 0.25s
+messaging timeout instead of the 6s default.
+
+**Position is written twice, either side of size.** Windows with a minimum size
+clamp the resize and then move themselves to stay on screen, undoing the first
+position write.
+
+**The strip follows the window, not the other way round.** When the user resizes
+the hosted window, the workspace rectangle is re-derived from the window and the
+strip matches its width. Move and resize notifications are coalesced with a
+generation counter, because a fast drag fires them dozens of times a second and a
+backlog of stale frames makes the strip visibly lag. A flag suppresses the reverse
+path so our own repositioning is not mistaken for a user drag.
+
+**Apps are launched with `activates = true`.** Document-based apps commonly create
+no window at all when launched quietly: TextEdit launches, reports zero AX windows
+indefinitely, and the tab never appears. If a running app still has no window it
+gets one reopen nudge, which is what makes a document app produce an untitled
+document or its open panel.
+
+**Raising uses AXFrontmost, not just NSRunningApplication.activate.** Since macOS
+14 an app may only activate another app while it holds activation rights, and the
+tab strip is a non-activating panel, so Host is almost never frontmost and the
+request is refused. The window gets placed correctly and then never comes forward,
+which looks exactly like the tab doing nothing. Setting `AXFrontmost` goes through
+the Accessibility API, which is not subject to that restriction.
+
+**Geometry notifications caused by our own placement are suppressed for a second
+after we place a window.** Otherwise an app with a minimum window size reports its
+clamped frame, that gets read back as the user resizing the workspace, and the
+size the user actually chose is silently replaced by whatever the least flexible
+app in the workspace permits. Photos is the example here: it will not go below
+about 615pt tall, and without the suppression one visit to the Photos tab
+permanently resized everything else.
+
+**Outgoing apps are not hidden, just covered.** `hide()`/`unhide()` brings the
+Dock genie animation with it, which is exactly the flicker worth avoiding. Every
+tab shares one rectangle, so the incoming window covers the outgoing one.
+
+**AX coordinates are top-left origin off the primary display; Cocoa is
+bottom-left.** `Coords.flip` is the whole of it, and getting it wrong is why
+windows end up mirrored vertically.
+
+## Known limits
+
+- **One Space, no full-screen apps.** Not an issue here — Spaces are unused — but
+  worth recording: a window on a Space you are not on cannot be repositioned by
+  any public API. yabai only solves this by disabling SIP.
+- The system menu bar still belongs to whichever app is frontmost. This will feel like
+  fast app switching with a persistent strip, not like one app with tabs. That is
+  the gap most likely to disappoint at the end of Phase 2 — worth sitting with
+  before building more.
+- **Apps with a minimum window size overflow the workspace rather than resizing
+  it.** Photos will not go below ~615pt tall. It is placed at the workspace origin
+  and simply extends past the bottom; the strip and every other tab keep the size
+  you chose. The log says so explicitly when it happens.
+- **`⌃1`–`⌃3` register successfully but never fire**, because macOS reserves
+  control-digit for Mission Control's "Switch to Desktop N" and consumes them
+  before Carbon hotkeys see them. Changing `controlKey` to `optionKey` in
+  `HotKeys.swift` is the whole fix. Clicking tabs works.
+- One window per app. A second document window is not tracked; the AX observer
+  notices and unbinds, and the next click rebinds to whatever is main.
+- Multi-monitor is untested.
+
+## Debugging
+
+Everything is logged to `~/Library/Logs/Host.log` as well as the in-app log window.
+
+- **Tabs › Diagnose Tabs** — read-only report per app: window count, role, subrole,
+  whether position and size are settable, and whether Host would accept that
+  window. Launches nothing, moves nothing. Also runs at startup.
+- `open -a Host --args --cycle` — visit every tab once, logging what actually ended
+  up frontmost. Placement succeeding tells you nothing about z-order, and that
+  distinction has already been one real bug.
+- `open -a Host --args --add <bundle-id>` — exercise the add path without driving
+  the open panel.
+- `open -a Host --args --hide-test` — hide the first tab's app and report which of
+  the others followed.
+- `open -a Host --args --bar-preview <path>` — render the tab strip to a PNG, for
+  checking the look without a screen recording permission.
+- `open -a Host --args --resize-test` — resize the first tab to an odd size, then
+  switch through the others, logging requested vs actual for each. This is what
+  caught the minimum-size problem.
+
+## Layout
+
+```
+Sources/
+  AX.swift             low-level AX helpers, coordinate flip, permission, logging
+  WindowManager.swift  launch / find / place / raise, off-main-thread, AX observers
+  HotKeys.swift        Carbon global hotkeys
+  Workspace.swift      tab model, workspace rectangle, JSON persistence
+  TabStrip.swift       the floating non-activating panel and its buttons
+  SelfTest.swift       ten-switch drift measurement, log window
+  AppDelegate.swift    wiring, status item, permission nag
+tools/make-identity.sh stable self-signed signing identity
+  Sunset.swift         the shared palette and stripe treatment, used by both the
+                       app icon and the tab strip so they cannot drift apart
+tools/icongen/         composites the app icon; `make icon` regenerates AppIcon.icns
+Resources/artwork.png  the line drawing, black on white
+```
