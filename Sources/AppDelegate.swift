@@ -31,6 +31,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if CommandLine.arguments.contains("--cycle") { cycleAllTabs() }
             if CommandLine.arguments.contains("--resize-test") { resizeTest() }
             if CommandLine.arguments.contains("--hide-test") { hideTest() }
+            // `--move-tab 4 0` exercises the reorder model without a mouse.
+            if let i = CommandLine.arguments.firstIndex(of: "--move-tab"),
+               i + 2 < CommandLine.arguments.count,
+               let from = Int(CommandLine.arguments[i + 1]),
+               let to = Int(CommandLine.arguments[i + 2]) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    Log.line("before: \(self.strip.workspace.tabs.map(\.name).joined(separator: ", "))")
+                    self.strip.moveTab(from: from, to: to)
+                }
+            }
             if let i = CommandLine.arguments.firstIndex(of: "--bar-preview"),
                i + 1 < CommandLine.arguments.count {
                 let path = CommandLine.arguments[i + 1]
@@ -63,9 +73,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.line("hotkeys: control-1 .. control-\(strip.workspace.tabs.count)")
     }
 
-    /// Clicking the Dock icon when the strip has been ordered out brings it back.
+    /// Clicking the Dock icon brings the whole workspace back, not just the strip.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        strip?.raiseStrip()
+        strip?.restoreWorkspace()
         return true
     }
 

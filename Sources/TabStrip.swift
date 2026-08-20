@@ -27,11 +27,44 @@ final class TabStripPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+/// A tab button that distinguishes a click from a drag.
+///
+/// NSButton's own mouseDown runs a tracking loop and swallows every event until
+/// mouseUp, so there is no way to see a drag from the outside. Taking over the
+/// loop is the only way to get both behaviours from one press.
+final class TabButton: NSButton {
+    var bundleIdentifier = ""
+    var onDragMoved: ((TabButton, CGPoint) -> Void)?
+    var onDragEnded: ((TabButton) -> Void)?
+
+    override func mouseDown(with event: NSEvent) {
+        let start = event.locationInWindow
+        var dragging = false
+
+        while let next = NSApp.nextEvent(matching: [.leftMouseDragged, .leftMouseUp],
+                                         until: .distantFuture,
+                                         inMode: .eventTracking, dequeue: true) {
+            if next.type == .leftMouseUp { break }
+            // A few points of slop, so a slightly unsteady click is still a click.
+            if !dragging && abs(next.locationInWindow.x - start.x) > 4 { dragging = true }
+            if dragging, let parent = superview {
+                onDragMoved?(self, parent.convert(next.locationInWindow, from: nil))
+            }
+        }
+
+        if dragging {
+            onDragEnded?(self)
+        } else if let action, let target {
+            sendAction(action, to: target)
+        }
+    }
+}
+
 final class TabStripController: NSObject, NSWindowDelegate {
     private(set) var workspace: Workspace
     private let panel: TabStripPanel
     private let stack = NSStackView()
-    private var buttons: [NSButton] = []
+    private var buttons: [TabButton] = []
     private(set) var activeIndex: Int?
 
     init(workspace: Workspace) {
@@ -79,9 +112,12 @@ final class TabStripController: NSObject, NSWindowDelegate {
         buttons.removeAll()
 
         for (index, tab) in workspace.tabs.enumerated() {
-            let button = NSButton(title: "", target: self, action: #selector(tabClicked(_:)))
+            let button = TabButton(title: "", target: self, action: #selector(tabClicked(_:)))
             button.tag = index
+            button.bundleIdentifier = tab.bundleIdentifier
             button.imagePosition = .imageLeading
+            button.onDragMoved = { [weak self] b, point in self?.dragTab(b, to: point) }
+            button.onDragEnded = { [weak self] _ in self?.commitTabOrder() }
             style(button, title: tab.name)
             if let icon = tab.icon {
                 icon.size = NSSize(width: 16, height: 16)
@@ -266,6 +302,78 @@ final class TabStripController: NSObject, NSWindowDelegate {
         panel.orderFrontRegardless()
     }
 
+    /// Bring the workspace back after it has been hidden: the strip and the tab
+    /// that was active when it went away. Raising the strip alone leaves a bar
+    /// floating over nothing.
+    ///
+    /// Only the active tab is unhidden, not all of them, for the same reason
+    /// appDidUnhide does not: coming back to one tab should not haul the other
+    /// four onto the screen with it.
+    func restoreWorkspace() {
+        raiseStrip()
+        guard !workspace.tabs.isEmpty else { return }
+        let index = activeIndex ?? 0
+        Log.line("restoring workspace: strip + \(workspace.tabs[index].name)")
+        select(index: index)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            let states = self.workspace.tabs.map { tab -> String in
+                guard let app = WindowManager.runningApp(tab.bundleIdentifier) else { return "\(tab.name)=off" }
+                return "\(tab.name)=\(app.isHidden ? "hidden" : "shown")"
+            }
+            Log.line("  after restore: \(states.joined(separator: "  "))  strip=\(self.panel.isVisible)")
+        }
+    }
+
+    // MARK: - Reordering by dragging
+
+    /// Slide the dragged button through the row as the pointer passes the midpoint
+    /// of its neighbours. The button snaps between slots rather than following the
+    /// pointer, because the stack view owns the frames.
+    private func dragTab(_ button: TabButton, to point: CGPoint) {
+        guard let current = buttons.firstIndex(of: button) else { return }
+        let others = buttons.filter { $0 !== button }
+        var target = others.filter { $0.frame.midX < point.x }.count
+        target = max(0, min(target, buttons.count - 1))
+        guard target != current else { return }
+
+        button.removeFromSuperview()
+        stack.insertArrangedSubview(button, at: target)
+        buttons.remove(at: current)
+        buttons.insert(button, at: target)
+    }
+
+    /// Persist whatever order the buttons ended up in.
+    private func commitTabOrder() {
+        let order = buttons.compactMap { button in
+            workspace.tabs.first { $0.bundleIdentifier == button.bundleIdentifier }
+        }
+        guard order.count == workspace.tabs.count, order != workspace.tabs else {
+            rebuild()   // no change, but the live drag left the row out of step
+            return
+        }
+        let activeID = activeIndex.map { workspace.tabs[$0].bundleIdentifier }
+        workspace.tabs = order
+        // Indices moved, so the active tab and the hotkeys must be remapped.
+        activeIndex = activeID.flatMap { id in order.firstIndex { $0.bundleIdentifier == id } }
+        Store.save(workspace)
+        rebuild()
+        AppDelegate.shared?.registerHotKeys()
+        Log.line("reordered: \(order.map(\.name).joined(separator: ", "))")
+    }
+
+    /// Move a tab by index. Exists so the reorder can be exercised without a mouse.
+    func moveTab(from: Int, to: Int) {
+        guard workspace.tabs.indices.contains(from), workspace.tabs.indices.contains(to) else { return }
+        let activeID = activeIndex.map { workspace.tabs[$0].bundleIdentifier }
+        let tab = workspace.tabs.remove(at: from)
+        workspace.tabs.insert(tab, at: to)
+        activeIndex = activeID.flatMap { id in workspace.tabs.firstIndex { $0.bundleIdentifier == id } }
+        Store.save(workspace)
+        rebuild()
+        AppDelegate.shared?.registerHotKeys()
+        Log.line("reordered: \(workspace.tabs.map(\.name).joined(separator: ", "))")
+    }
+
     // MARK: - Staying out of the way
 
     /// The strip floats above normal windows so it can sit on top of the app it is
@@ -280,6 +388,15 @@ final class TabStripController: NSObject, NSWindowDelegate {
         let id = app.bundleIdentifier
         let ours = id == Bundle.main.bundleIdentifier
             || workspace.tabs.contains { $0.bundleIdentifier == id }
+
+        // Keep the highlight on whatever tab is genuinely frontmost, including when
+        // you reach it with command-tab rather than by clicking. This is the only
+        // thing besides select() allowed to move the active tab.
+        if let id, let index = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) {
+            activeIndex = index
+            highlight(index)
+        }
+
         guard ours != isWorkspaceFront else { return }
         isWorkspaceFront = ours
         if ours {
@@ -322,12 +439,14 @@ final class TabStripController: NSObject, NSWindowDelegate {
         guard !isBulkHiding,
               let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               let id = app.bundleIdentifier,
-              let index = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) else { return }
+              workspace.tabs.contains(where: { $0.bundleIdentifier == id }) else { return }
         // Only the strip comes back, not every app: unhiding one tab should not
         // drag the other four onto the screen with it.
+        //
+        // Deliberately does not touch activeIndex. An app unhiding in the
+        // background is not you choosing a tab, and letting it reassign the active
+        // tab means a later restore brings back the wrong window.
         Log.line("\(id) unhidden; restoring the strip")
-        activeIndex = index
-        highlight(index)
         showStripIfAppropriate()
     }
 
