@@ -7,6 +7,10 @@ enum ThemeStyle {
     case stripes([NSColor])
     /// A smooth ramp through the given stops along the same diagonal.
     case gradient([NSColor])
+    case polkaDots(background: NSColor, dots: [NSColor])
+    case packedCircles(background: NSColor, circles: [NSColor], seed: UInt64)
+    case triangles([NSColor], seed: UInt64)
+    case sunflowers(background: NSColor, petals: [NSColor], centre: NSColor)
 }
 
 struct Theme {
@@ -92,9 +96,148 @@ struct Theme {
                 }
             }
             context.restoreGraphicsState()
+        case .polkaDots(let background, let dots):
+            drawPolkaDots(in: path, background: background, dots: dots, tiled: stripeWidth != nil)
+        case .packedCircles(let background, let circles, let seed):
+            drawPackedCircles(in: path, background: background, colours: circles,
+                              seed: seed, tiled: stripeWidth != nil)
+        case .triangles(let colours, let seed):
+            drawTriangles(in: path, colours: colours, seed: seed, tiled: stripeWidth != nil)
+        case .sunflowers(let background, let petals, let centre):
+            drawSunflowers(in: path, background: background, petals: petals,
+                           centre: centre, tiled: stripeWidth != nil)
         }
 
         if let starSeed { scatterStars(in: path, seed: starSeed) }
+    }
+
+    private func clipped(_ path: NSBezierPath, background: NSColor, draw: (CGRect) -> Void) {
+        background.setFill()
+        path.fill()
+        guard let context = NSGraphicsContext.current else { return }
+        context.saveGraphicsState()
+        path.addClip()
+        draw(path.bounds)
+        context.restoreGraphicsState()
+    }
+
+    private func drawPolkaDots(in path: NSBezierPath, background: NSColor,
+                               dots: [NSColor], tiled: Bool) {
+        clipped(path, background: background) { bounds in
+            let spacing = tiled ? CGFloat(24) : bounds.width / 7
+            let radius = spacing * 0.22
+            var row = 0
+            var y = bounds.minY - spacing
+            while y < bounds.maxY + spacing {
+                var column = 0
+                var x = bounds.minX - spacing + (row.isMultiple(of: 2) ? 0 : spacing / 2)
+                while x < bounds.maxX + spacing {
+                    dots[(row + column) % dots.count].setFill()
+                    NSBezierPath(ovalIn: CGRect(x: x - radius, y: y - radius,
+                                               width: radius * 2, height: radius * 2)).fill()
+                    column += 1
+                    x += spacing
+                }
+                row += 1
+                y += spacing
+            }
+        }
+    }
+
+    private func drawPackedCircles(in path: NSBezierPath, background: NSColor,
+                                   colours: [NSColor], seed initialSeed: UInt64, tiled: Bool) {
+        clipped(path, background: background) { bounds in
+            var seed = initialSeed
+            func random() -> CGFloat {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return CGFloat((seed >> 33) % 100_000) / 100_000
+            }
+            let scale = tiled ? max(bounds.height, 44) : bounds.width
+            let target = max(20, Int(bounds.width * bounds.height / (scale * scale) * 90))
+            var circles: [(CGPoint, CGFloat)] = []
+            for _ in 0..<(target * 12) where circles.count < target {
+                let radius = scale * (0.025 + random() * 0.07)
+                let centre = CGPoint(x: bounds.minX + random() * bounds.width,
+                                     y: bounds.minY + random() * bounds.height)
+                guard circles.allSatisfy({ hypot($0.0.x - centre.x, $0.0.y - centre.y) > $0.1 + radius + 1 }) else {
+                    continue
+                }
+                colours[circles.count % colours.count].setFill()
+                NSBezierPath(ovalIn: CGRect(x: centre.x - radius, y: centre.y - radius,
+                                           width: radius * 2, height: radius * 2)).fill()
+                circles.append((centre, radius))
+            }
+        }
+    }
+
+    private func drawTriangles(in path: NSBezierPath, colours: [NSColor],
+                               seed initialSeed: UInt64, tiled: Bool) {
+        clipped(path, background: colours[0]) { bounds in
+            var seed = initialSeed
+            func random() -> CGFloat {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return CGFloat((seed >> 33) % 100_000) / 100_000
+            }
+            let cell = tiled ? CGFloat(38) : bounds.width / 5
+            var row = 0
+            var y = bounds.minY - cell
+            while y < bounds.maxY + cell {
+                var column = 0
+                var x = bounds.minX - cell
+                while x < bounds.maxX + cell {
+                    let skew = (random() - 0.5) * cell * 0.45
+                    let points = [CGPoint(x: x, y: y), CGPoint(x: x + cell, y: y),
+                                  CGPoint(x: x + cell + skew, y: y + cell),
+                                  CGPoint(x: x + skew, y: y + cell)]
+                    for indices in [[0, 1, 2], [0, 2, 3]] {
+                        colours[(row * 2 + column + indices[1]) % colours.count].setFill()
+                        let triangle = NSBezierPath()
+                        triangle.move(to: points[indices[0]])
+                        triangle.line(to: points[indices[1]])
+                        triangle.line(to: points[indices[2]])
+                        triangle.close()
+                        triangle.fill()
+                    }
+                    column += 1
+                    x += cell
+                }
+                row += 1
+                y += cell
+            }
+        }
+    }
+
+    private func drawSunflowers(in path: NSBezierPath, background: NSColor,
+                                petals: [NSColor], centre: NSColor, tiled: Bool) {
+        clipped(path, background: background) { bounds in
+            let spacing = tiled ? CGFloat(42) : bounds.width / 4
+            var row = 0
+            var y = bounds.minY - spacing / 2
+            while y < bounds.maxY + spacing {
+                var column = 0
+                var x = bounds.minX + (row.isMultiple(of: 2) ? 0 : spacing / 2)
+                while x < bounds.maxX + spacing {
+                    let flowerCentre = CGPoint(x: x, y: y)
+                    for petal in 0..<10 {
+                        let angle = CGFloat(petal) * .pi / 5
+                        let petalCentre = CGPoint(x: x + cos(angle) * spacing * 0.18,
+                                                 y: y + sin(angle) * spacing * 0.18)
+                        petals[(row + column + petal) % petals.count].setFill()
+                        NSBezierPath(ovalIn: CGRect(x: petalCentre.x - spacing * 0.07,
+                                                   y: petalCentre.y - spacing * 0.12,
+                                                   width: spacing * 0.14, height: spacing * 0.24)).fill()
+                    }
+                    centre.setFill()
+                    NSBezierPath(ovalIn: CGRect(x: flowerCentre.x - spacing * 0.10,
+                                               y: flowerCentre.y - spacing * 0.10,
+                                               width: spacing * 0.20, height: spacing * 0.20)).fill()
+                    column += 1
+                    x += spacing
+                }
+                row += 1
+                y += spacing
+            }
+        }
     }
 
     /// Deterministic, so the icon does not shimmer between redraws.
@@ -230,6 +373,60 @@ extension Theme {
                                rgb(0.01, 0.05, 0.02)]),
               ink: rgb(0.22, 1.00, 0.42), text: rgb(0.45, 1.00, 0.60),
               chip: rgb(0.02, 0.07, 0.03)),
+
+        Theme(id: "mushroom", name: "Mushroom",
+              style: .polkaDots(background: rgb(0.91, 0.80, 0.64),
+                                dots: [rgb(0.52, 0.17, 0.12), rgb(0.72, 0.31, 0.20), rgb(0.96, 0.88, 0.69)]),
+              ink: rgb(0.25, 0.10, 0.07), text: rgb(0.20, 0.09, 0.06), chip: rgb(0.96, 0.90, 0.78)),
+
+        Theme(id: "beige", name: "Beige",
+              style: .gradient([rgb(0.96, 0.93, 0.85), rgb(0.87, 0.81, 0.69), rgb(0.73, 0.64, 0.51)]),
+              ink: rgb(0.25, 0.21, 0.16), text: rgb(0.19, 0.16, 0.12), chip: rgb(0.97, 0.94, 0.87)),
+
+        Theme(id: "dune", name: "Dune",
+              style: .gradient([rgb(0.95, 0.72, 0.37), rgb(0.77, 0.43, 0.22), rgb(0.32, 0.20, 0.22),
+                                rgb(0.09, 0.25, 0.31)]),
+              ink: rgb(0.10, 0.08, 0.07), text: rgb(0.18, 0.10, 0.06), chip: rgb(0.96, 0.82, 0.59)),
+
+        Theme(id: "starship", name: "Starship",
+              style: .triangles([rgb(0.02, 0.04, 0.10), rgb(0.05, 0.10, 0.20), rgb(0.08, 0.22, 0.30),
+                                 rgb(0.22, 0.08, 0.30), rgb(0.38, 0.08, 0.35)], seed: 0x57A2511),
+              ink: rgb(0.62, 1.00, 0.94), text: rgb(0.78, 1.00, 0.96),
+              chip: rgb(0.03, 0.08, 0.14), starSeed: 0xC05A05),
+
+        Theme(id: "vim", name: "Vim",
+              style: .stripes([rgb(0.00, 0.24, 0.12), rgb(0.00, 0.38, 0.20), rgb(0.08, 0.54, 0.29),
+                               rgb(0.14, 0.25, 0.36), rgb(0.08, 0.15, 0.25), rgb(0.02, 0.08, 0.12)]),
+              ink: rgb(0.63, 1.00, 0.68), text: rgb(0.76, 1.00, 0.79), chip: rgb(0.02, 0.16, 0.10)),
+
+        Theme(id: "sunflowers", name: "Sunflowers",
+              style: .sunflowers(background: rgb(0.18, 0.39, 0.22),
+                                  petals: [rgb(1.00, 0.80, 0.06), rgb(0.95, 0.56, 0.02)],
+                                  centre: rgb(0.27, 0.12, 0.04)),
+              ink: rgb(0.19, 0.09, 0.03), text: rgb(0.20, 0.10, 0.03), chip: rgb(1.00, 0.88, 0.35)),
+
+        Theme(id: "silver-black", name: "Silver / Black",
+              style: .stripes([rgb(0.05, 0.05, 0.06), rgb(0.22, 0.23, 0.25), rgb(0.48, 0.50, 0.54),
+                               rgb(0.82, 0.83, 0.85), rgb(0.38, 0.39, 0.42), rgb(0.10, 0.10, 0.11)]),
+              ink: .white, text: .white, chip: rgb(0.10, 0.10, 0.11)),
+
+        Theme(id: "polka-dots", name: "Polka Dots",
+              style: .polkaDots(background: rgb(0.98, 0.88, 0.86),
+                                dots: [rgb(0.91, 0.19, 0.29), rgb(0.16, 0.57, 0.73), rgb(0.98, 0.65, 0.12)]),
+              ink: rgb(0.18, 0.12, 0.15), text: rgb(0.17, 0.10, 0.13), chip: rgb(1.00, 0.97, 0.94)),
+
+        Theme(id: "circle-packing", name: "Circle Packing",
+              style: .packedCircles(background: rgb(0.08, 0.08, 0.14),
+                                    circles: [rgb(0.96, 0.25, 0.36), rgb(0.99, 0.61, 0.17),
+                                              rgb(0.14, 0.73, 0.65), rgb(0.30, 0.45, 0.92),
+                                              rgb(0.70, 0.30, 0.86)], seed: 0xC1AC1E),
+              ink: .white, text: .white, chip: rgb(0.08, 0.08, 0.14)),
+
+        Theme(id: "delaunay-triangles", name: "Delaunay Triangles",
+              style: .triangles([rgb(0.96, 0.32, 0.22), rgb(0.99, 0.62, 0.18), rgb(0.98, 0.84, 0.28),
+                                 rgb(0.19, 0.68, 0.62), rgb(0.16, 0.43, 0.68), rgb(0.39, 0.24, 0.59)],
+                                seed: 0xDE1A0A7),
+              ink: rgb(0.08, 0.08, 0.12), text: rgb(0.10, 0.08, 0.12), chip: rgb(0.98, 0.94, 0.86)),
 
         Theme(id: "silver", name: "Silver",
               style: .stripes([rgb(0.97, 0.97, 0.98), rgb(0.91, 0.92, 0.94), rgb(0.84, 0.86, 0.89),

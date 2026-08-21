@@ -37,9 +37,9 @@ window, moves it into the rectangle below the strip, and raises it. `⌥⇧[` an
 - Drag a tab along the strip to reorder it; the order and the hotkey bindings
   follow
 - The **cog** at the right of the strip opens settings: pick the tab bar theme
-  and the app icon from nine themes — Sunset Stripes, Sunset, Rainbow, Meadow,
-  Brown, Galaxy, Starry Night, Hacker, Silver. The icon matches the theme by
-  default; click any icon to break the link and choose independently.
+  and the app icon from 19 themes. The set includes stripes, gradients, night
+  skies, polka dots, packed circles, sunflowers and triangles. The icon matches
+  the theme by default; click any icon to break the link and choose independently.
   Also on View › Theme and Tabs › Settings (command-comma), for when Host
   happens to be frontmost
 - Dock icon and a **Tabs** menu holding Add Application, Self-test, Show Log and
@@ -104,10 +104,10 @@ itself behind it as you click through the themes.
 
 ## Themes
 
-`Sources/Theme.swift` holds the palettes; `Sources/IconRenderer.swift` composites
-the line drawing onto one. Both are compiled into the app *and* into the icon
-tool, so the .icns on disk and the icon the app draws at runtime come from the
-same code.
+`Sources/Theme.swift` holds the palettes and pattern renderers;
+`Sources/IconRenderer.swift` composites the line drawing onto one. Both are
+compiled into the app *and* into the icon tool, so the .icns on disk and the icon
+the app draws at runtime come from the same code.
 
 The Dock icon is redrawn in process rather than swapped on disk. Rewriting a
 signed bundle's .icns would break the code signature and take the Accessibility
@@ -251,7 +251,7 @@ Sources/
   SelfTest.swift       ten-switch drift measurement, log window
   AppDelegate.swift    wiring, status item, permission nag
 tools/make-identity.sh stable self-signed signing identity
-  Theme.swift          palettes and the striped/gradient drawing, shared by the
+  Theme.swift          palettes and pattern drawing, shared by the
                        tab strip and the app icon
   IconRenderer.swift   masks and crops the line art, composites it onto a theme
   SettingsWindow.swift the theme and app icon pickers, opened from the cog
