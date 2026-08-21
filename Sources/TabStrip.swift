@@ -172,7 +172,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         button.setButtonType(.momentaryChange)
         button.wantsLayer = true
         button.layer?.cornerRadius = 7
-        button.layer?.backgroundColor = Theme.current.chip.cgColor
+        button.layer?.backgroundColor = Theme.current.chip.withAlphaComponent(0.55).cgColor
         button.heightAnchor.constraint(equalToConstant: 26).isActive = true
         button.attributedTitle = NSAttributedString(string: "  \(title)  ", attributes: [
             .foregroundColor: Theme.current.text,
@@ -180,14 +180,17 @@ final class TabStripController: NSObject, NSWindowDelegate {
         ])
     }
 
-    /// The active tab is marked by weight, not by a lighter or darker card.
+    /// The active tab gets a solid card; the rest are translucent, so the stripe
+    /// shows through them and only the tab you are on reads as fully opaque.
     ///
-    /// Distinguishing it by card opacity was the obvious approach and it is wrong:
-    /// a translucent card picks up whatever band is behind it, which is the exact
-    /// problem the card exists to solve, and on Rainbow it turns half the tabs
-    /// green and blue. Cards stay solid; the type does the work.
+    /// The translucent cards do pick up a tint from the band behind them, which on
+    /// Rainbow means a tab can sit on green or blue. That is a deliberate trade for
+    /// the lighter look -- the text stays legible either way, and weight marks the
+    /// active tab independently of the background.
     private func applyChip(_ button: TabButton, active: Bool) {
-        button.layer?.backgroundColor = Theme.current.chip.cgColor
+        button.layer?.backgroundColor = active
+            ? Theme.current.chip.cgColor
+            : Theme.current.chip.withAlphaComponent(0.55).cgColor
         button.attributedTitle = NSAttributedString(string: "  \(button.tabName)  ", attributes: [
             .foregroundColor: Theme.current.text,
             .font: NSFont.systemFont(ofSize: 12, weight: active ? .bold : .regular),

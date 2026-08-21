@@ -102,10 +102,11 @@ lets the stripes be as bold as they like: text never touches the background, so
 legibility stops depending on which band happens to pass behind a given tab.
 Rainbow is the case that proves it.
 
-The active tab is marked by weight rather than by a lighter or darker card.
-Distinguishing it by card opacity is the obvious approach and it is wrong -- a
-translucent card picks up the band behind it, which is the exact problem the card
-exists to solve.
+The active tab gets a solid card and bold type; the rest are translucent, so only
+the tab you are on reads as fully opaque. The translucent cards do pick up a tint
+from the band behind them -- on Rainbow a tab can end up sitting on green or blue
+-- which is a deliberate trade for the lighter look. Text stays legible either
+way, and the weight marks the active tab independently of the background.
 
 Two details that matter to how it looks:
 
