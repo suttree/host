@@ -12,7 +12,7 @@ enum ThemeStyle {
     case triangles([NSColor], seed: UInt64)
     case sunflowers(background: NSColor, petals: [NSColor], centre: NSColor)
     case diamonds(background: NSColor, diamonds: [NSColor])
-    case waves(background: NSColor, waves: [NSColor])
+    case waves(background: NSColor, waves: [NSColor], spacing: CGFloat, amplitude: CGFloat)
     case bubbles(background: NSColor, bubbles: [NSColor], seed: UInt64)
     case radial([NSColor])
     case grain(background: NSColor, shades: [NSColor], seed: UInt64)
@@ -114,8 +114,9 @@ struct Theme {
         case .diamonds(let background, let diamonds):
             drawDiamonds(in: path, background: background, colours: diamonds,
                          tiled: stripeWidth != nil)
-        case .waves(let background, let waves):
+        case .waves(let background, let waves, let spacing, let amplitude):
             drawWaves(in: path, background: background, colours: waves,
+                      spacingScale: spacing, amplitudeScale: amplitude,
                       tiled: stripeWidth != nil)
         case .bubbles(let background, let bubbles, let seed):
             drawBubbles(in: path, background: background, colours: bubbles,
@@ -299,13 +300,15 @@ struct Theme {
     }
 
     private func drawWaves(in path: NSBezierPath, background: NSColor,
-                           colours: [NSColor], tiled: Bool) {
+                           colours: [NSColor], spacingScale: CGFloat,
+                           amplitudeScale: CGFloat, tiled: Bool) {
         clipped(path, background: background) { bounds in
-            let spacing = tiled ? CGFloat(13) : bounds.height / 11
-            let amplitude = spacing * 0.42
+            let baseSpacing = tiled ? CGFloat(13) : bounds.height / 11
+            let spacing = baseSpacing * spacingScale
+            let amplitude = spacing * 0.42 * amplitudeScale
             for row in -2...Int(bounds.height / spacing) + 2 {
                 let wave = NSBezierPath()
-                wave.lineWidth = max(2, spacing * 0.52)
+                wave.lineWidth = max(2, baseSpacing * 0.52)
                 var x = bounds.minX - 10
                 while x <= bounds.maxX + 10 {
                     let y = bounds.minY + CGFloat(row) * spacing
@@ -575,6 +578,11 @@ extension Theme {
                                 rgb(0.34, 0.25, 0.52)]),
               ink: rgb(0.20, 0.13, 0.32), text: rgb(0.20, 0.13, 0.32), chip: rgb(0.95, 0.91, 0.98)),
 
+        Theme(id: "lavender-kitten-grey", name: "Lavender & Kitten Grey",
+              style: .gradient([rgb(0.91, 0.86, 0.96), rgb(0.75, 0.69, 0.82), rgb(0.61, 0.60, 0.66),
+                                rgb(0.43, 0.44, 0.48)]),
+              ink: rgb(0.20, 0.18, 0.25), text: rgb(0.18, 0.17, 0.21), chip: rgb(0.94, 0.91, 0.95)),
+
         Theme(id: "fern", name: "Fern",
               style: .triangles([rgb(0.04, 0.18, 0.10), rgb(0.08, 0.30, 0.16), rgb(0.12, 0.44, 0.22),
                                  rgb(0.27, 0.58, 0.30), rgb(0.55, 0.70, 0.38)], seed: 0xFE2A),
@@ -590,8 +598,21 @@ extension Theme {
         Theme(id: "water", name: "Water",
               style: .waves(background: rgb(0.05, 0.26, 0.43),
                             waves: [rgb(0.10, 0.42, 0.65), rgb(0.16, 0.58, 0.76),
-                                    rgb(0.40, 0.76, 0.85), rgb(0.76, 0.91, 0.91)]),
+                                    rgb(0.40, 0.76, 0.85), rgb(0.76, 0.91, 0.91)],
+                            spacing: 1, amplitude: 1),
               ink: rgb(0.88, 0.98, 1.00), text: rgb(0.90, 0.98, 1.00), chip: rgb(0.04, 0.29, 0.46)),
+
+        Theme(id: "gentle-water", name: "Gentle Water",
+              style: .waves(background: rgb(0.10, 0.34, 0.48),
+                            waves: [rgb(0.16, 0.45, 0.58), rgb(0.27, 0.57, 0.67), rgb(0.50, 0.72, 0.77)],
+                            spacing: 2.4, amplitude: 0.30),
+              ink: rgb(0.84, 0.95, 0.95), text: rgb(0.89, 0.97, 0.97), chip: rgb(0.09, 0.31, 0.43)),
+
+        Theme(id: "sea-foam", name: "Sea Foam",
+              style: .waves(background: rgb(0.85, 0.94, 0.89),
+                            waves: [rgb(0.58, 0.82, 0.75), rgb(0.34, 0.68, 0.64), rgb(0.18, 0.53, 0.56)],
+                            spacing: 1.8, amplitude: 0.52),
+              ink: rgb(0.06, 0.29, 0.31), text: rgb(0.05, 0.25, 0.27), chip: rgb(0.94, 0.98, 0.94)),
 
         Theme(id: "sparkling-water", name: "Sparkling Water",
               style: .bubbles(background: rgb(0.66, 0.90, 0.91),
