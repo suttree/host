@@ -103,14 +103,14 @@ final class TabStripController: NSObject, NSWindowDelegate {
         NSLayoutConstraint.activate([
             cog.trailingAnchor.constraint(equalTo: background.trailingAnchor, constant: -12),
             cog.centerYAnchor.constraint(equalTo: background.centerYAnchor),
-            cog.widthAnchor.constraint(equalToConstant: 32),
-            cog.heightAnchor.constraint(equalToConstant: 30),
+            cog.widthAnchor.constraint(equalToConstant: 30),
+            cog.heightAnchor.constraint(equalToConstant: 26),
         ])
 
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 9
-        stack.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        stack.edgeInsets = NSEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
         stack.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -200,7 +200,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         button.wantsLayer = true
         button.layer?.cornerRadius = 8
         button.layer?.backgroundColor = Theme.current.chip.withAlphaComponent(0.55).cgColor
-        button.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 26).isActive = true
         button.attributedTitle = NSAttributedString(string: "  \(title)  ", attributes: [
             .foregroundColor: Theme.current.text,
             .font: NSFont.systemFont(ofSize: 12, weight: .medium),
