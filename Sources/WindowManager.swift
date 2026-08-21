@@ -53,7 +53,48 @@ final class WindowManager {
         queue.async {
             let result = self.placeSync(bundleID: bundleID, axRect: axRect)
             DispatchQueue.main.async { completion(result) }
+
+            // Check back once. Some apps -- Electron ones in particular -- restore
+            // their own remembered bounds a moment after being shown or activated,
+            // quietly undoing a placement that reported success at the time.
+            self.queue.asyncAfter(deadline: .now() + 0.45) {
+                self.reassert(bundleID: bundleID, axRect: axRect, reason: "after placement")
+            }
         }
+    }
+
+    /// Put a window back in the workspace without launching or activating anything.
+    ///
+    /// This is what makes the workspace hold together when you reach an app some
+    /// other way -- command-tab, clicking its window, the Dock. Without it a tab
+    /// can be the active tab while its window sits at whatever size the app last
+    /// chose, which looks like the sizing simply not working.
+    func snap(bundleID: String, in cocoaRect: CGRect) {
+        let axRect = Coords.flip(cocoaRect)
+        queue.async {
+            guard let app = Self.runningApp(bundleID), !app.isHidden else { return }
+            let element = self.appElement(for: app.processIdentifier)
+            guard let window = self.waitForWindow(bundleID: bundleID, appElement: element, deadline: 1)
+            else { return }
+            self.reassert(bundleID: bundleID, axRect: axRect, reason: "reached outside Host",
+                          window: window)
+        }
+    }
+
+    /// Reapply the frame if the window is not where the workspace says it should
+    /// be. Runs at most once per call, so an app that genuinely cannot comply --
+    /// one with a minimum size -- is not fought in a loop.
+    private func reassert(bundleID: String, axRect: CGRect, reason: String,
+                          window explicit: AXUIElement? = nil) {
+        guard let window = explicit ?? boundWindows[bundleID],
+              let actual = axFrame(window) else { return }
+        let off = max(abs(actual.minX - axRect.minX), abs(actual.minY - axRect.minY),
+                      abs(actual.width - axRect.width), abs(actual.height - axRect.height))
+        guard off > 2 else { return }
+
+        Log.line("  \(bundleID) is \(Int(off))pt out (\(reason)); putting it back")
+        self.suppressGeometryUntil[bundleID] = Date().addingTimeInterval(1.0)
+        axSetFrame(window, axRect)
     }
 
     func forget(bundleID: String) {

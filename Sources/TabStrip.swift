@@ -523,6 +523,10 @@ final class TabStripController: NSObject, NSWindowDelegate {
         if let id, let index = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) {
             activeIndex = index
             highlight(index)
+            // Reached without clicking its tab, so nothing has sized it. Snapping
+            // here is what stops a tab being active while its window sits at
+            // whatever size the app itself last decided on.
+            WindowManager.shared.snap(bundleID: id, in: workspace.contentFrame)
         }
 
         guard ours != isWorkspaceFront else { return }
@@ -560,7 +564,21 @@ final class TabStripController: NSObject, NSWindowDelegate {
             WindowManager.runningApp(tab.bundleIdentifier)?.hide()
         }
         panel.orderOut(nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.isBulkHiding = false }
+
+        // Check back before releasing the guard. hide() is a request, and an app
+        // that is busy or mid-launch can miss it, which leaves one window of the
+        // workspace stranded on screen after everything else has gone.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            let stragglers = self.workspace.tabs
+                .filter { $0.bundleIdentifier != id }
+                .compactMap { WindowManager.runningApp($0.bundleIdentifier) }
+                .filter { !$0.isHidden }
+            if !stragglers.isEmpty {
+                Log.line("  \(stragglers.count) did not hide; asking again")
+                stragglers.forEach { $0.hide() }
+            }
+            self.isBulkHiding = false
+        }
     }
 
     @objc private func appDidUnhide(_ note: Notification) {
@@ -575,6 +593,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         // background is not you choosing a tab, and letting it reassign the active
         // tab means a later restore brings back the wrong window.
         Log.line("\(id) unhidden; restoring the strip")
+        WindowManager.shared.snap(bundleID: id, in: workspace.contentFrame)
         showStripIfAppropriate()
     }
 
