@@ -96,6 +96,17 @@ signed bundle's .icns would break the code signature and take the Accessibility
 grant with it. `NSApplication.applicationIconImage` is an in-memory property
 macOS forgets on relaunch, so the stored theme is re-applied at every launch.
 
+Every tab sits on a solid card in the theme's `chip` colour, off-white for the
+daylight themes and dark for Galaxy, Starry Night and Hacker. That card is what
+lets the stripes be as bold as they like: text never touches the background, so
+legibility stops depending on which band happens to pass behind a given tab.
+Rainbow is the case that proves it.
+
+The active tab is marked by weight rather than by a lighter or darker card.
+Distinguishing it by card opacity is the obvious approach and it is wrong -- a
+translucent card picks up the band behind it, which is the exact problem the card
+exists to solve.
+
 Two details that matter to how it looks:
 
 - On the icon the palette is fitted across the shape exactly **once**. Tiling it

@@ -16,20 +16,24 @@ struct Theme {
     /// The line art's colour. Pure black is rarely right: warm palettes want a
     /// brown, dark palettes need something light or the drawing disappears.
     let ink: NSColor
-    /// Tab titles, and the pill behind the active tab.
+    /// Tab titles, and the card each tab's icon and name sit on.
+    ///
+    /// The card is what makes the stripes free to be as bold as they like: text
+    /// never touches the background, so contrast is a property of the card rather
+    /// than of whichever band happens to pass behind a given tab.
     let text: NSColor
-    let pill: NSColor
+    let chip: NSColor
     /// Scattered points of light, for the night skies.
     let stars: Bool
 
     init(id: String, name: String, style: ThemeStyle, ink: NSColor,
-         text: NSColor, pill: NSColor, stars: Bool = false) {
+         text: NSColor, chip: NSColor, stars: Bool = false) {
         self.id = id
         self.name = name
         self.style = style
         self.ink = ink
         self.text = text
-        self.pill = pill
+        self.chip = chip
         self.stars = stars
     }
 
@@ -162,56 +166,56 @@ extension Theme {
               style: .stripes([rgb(1.00, 0.98, 0.78), rgb(1.00, 0.88, 0.40), rgb(1.00, 0.76, 0.03),
                                rgb(1.00, 0.60, 0.00), rgb(1.00, 0.44, 0.00), rgb(0.90, 0.29, 0.10),
                                rgb(0.75, 0.21, 0.05)]),
-              ink: rgb(0.16, 0.09, 0.05), text: .black, pill: NSColor(white: 1, alpha: 0.55)),
+              ink: rgb(0.16, 0.09, 0.05), text: .black, chip: rgb(0.98, 0.97, 0.95)),
 
         Theme(id: "sunset", name: "Sunset",
               style: .gradient([rgb(0.98, 0.88, 0.48), rgb(0.95, 0.61, 0.22), rgb(0.84, 0.34, 0.18)]),
-              ink: rgb(0.14, 0.08, 0.05), text: .black, pill: NSColor(white: 1, alpha: 0.55)),
+              ink: rgb(0.14, 0.08, 0.05), text: .black, chip: rgb(0.98, 0.97, 0.95)),
 
         Theme(id: "rainbow", name: "Rainbow",
               style: .stripes([rgb(0.93, 0.11, 0.14), rgb(1.00, 0.50, 0.15), rgb(1.00, 0.95, 0.00),
                                rgb(0.13, 0.69, 0.30), rgb(0.00, 0.64, 0.91), rgb(0.25, 0.28, 0.80),
                                rgb(0.64, 0.29, 0.64)]),
-              ink: .black, text: .black, pill: NSColor(white: 1, alpha: 0.70)),
+              ink: .black, text: .black, chip: rgb(0.98, 0.97, 0.95)),
 
         Theme(id: "meadow", name: "Meadow",
               style: .stripes([rgb(0.95, 0.98, 0.87), rgb(0.86, 0.95, 0.69), rgb(0.71, 0.88, 0.48),
                                rgb(0.50, 0.79, 0.31), rgb(0.31, 0.66, 0.23), rgb(0.18, 0.51, 0.21),
                                rgb(0.12, 0.37, 0.18)]),
-              ink: rgb(0.07, 0.17, 0.09), text: .black, pill: NSColor(white: 1, alpha: 0.60)),
+              ink: rgb(0.07, 0.17, 0.09), text: .black, chip: rgb(0.98, 0.97, 0.95)),
 
         Theme(id: "brown", name: "Brown",
               style: .stripes([rgb(0.96, 0.90, 0.82), rgb(0.91, 0.81, 0.66), rgb(0.83, 0.69, 0.48),
                                rgb(0.73, 0.55, 0.33), rgb(0.59, 0.41, 0.23), rgb(0.44, 0.29, 0.16),
                                rgb(0.29, 0.19, 0.10)]),
-              ink: rgb(0.16, 0.10, 0.05), text: .black, pill: NSColor(white: 1, alpha: 0.55)),
+              ink: rgb(0.16, 0.10, 0.05), text: .black, chip: rgb(0.98, 0.97, 0.95)),
 
         Theme(id: "galaxy", name: "Galaxy",
               style: .stripes([rgb(0.29, 0.16, 0.54), rgb(0.24, 0.13, 0.47), rgb(0.20, 0.10, 0.40),
                                rgb(0.16, 0.08, 0.33), rgb(0.13, 0.06, 0.26), rgb(0.09, 0.04, 0.19),
                                rgb(0.06, 0.03, 0.13)]),
-              ink: rgb(0.93, 0.88, 1.00), text: .white,
-              pill: NSColor(white: 1, alpha: 0.22), stars: true),
+              ink: rgb(0.93, 0.88, 1.00), text: rgb(0.95, 0.92, 1.00),
+              chip: rgb(0.13, 0.07, 0.26), stars: true),
 
         Theme(id: "starry-night", name: "Starry Night",
               style: .stripes([rgb(0.16, 0.28, 0.53), rgb(0.12, 0.23, 0.46), rgb(0.09, 0.19, 0.39),
                                rgb(0.14, 0.26, 0.49), rgb(0.10, 0.21, 0.41), rgb(0.07, 0.16, 0.31),
                                rgb(0.05, 0.12, 0.25)]),
-              ink: rgb(0.96, 0.83, 0.42), text: .white,
-              pill: NSColor(white: 1, alpha: 0.22), stars: true),
+              ink: rgb(0.96, 0.83, 0.42), text: rgb(0.98, 0.90, 0.62),
+              chip: rgb(0.06, 0.13, 0.27), stars: true),
 
         Theme(id: "hacker", name: "Hacker",
               style: .stripes([rgb(0.05, 0.13, 0.06), rgb(0.03, 0.09, 0.04), rgb(0.06, 0.16, 0.07),
                                rgb(0.02, 0.07, 0.03), rgb(0.05, 0.12, 0.06), rgb(0.03, 0.08, 0.04),
                                rgb(0.01, 0.05, 0.02)]),
-              ink: rgb(0.22, 1.00, 0.42), text: rgb(0.60, 1.00, 0.70),
-              pill: NSColor(white: 1, alpha: 0.16)),
+              ink: rgb(0.22, 1.00, 0.42), text: rgb(0.45, 1.00, 0.60),
+              chip: rgb(0.02, 0.07, 0.03)),
 
         Theme(id: "silver", name: "Silver",
               style: .stripes([rgb(0.97, 0.97, 0.98), rgb(0.91, 0.92, 0.94), rgb(0.84, 0.86, 0.89),
                                rgb(0.76, 0.78, 0.82), rgb(0.67, 0.70, 0.75), rgb(0.57, 0.60, 0.66),
                                rgb(0.47, 0.50, 0.56)]),
-              ink: rgb(0.10, 0.11, 0.13), text: .black, pill: NSColor(white: 1, alpha: 0.70)),
+              ink: rgb(0.10, 0.11, 0.13), text: .black, chip: rgb(0.98, 0.97, 0.95)),
     ]
 
     static let fallback = all[0]

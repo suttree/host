@@ -45,6 +45,7 @@ final class ThemeBarView: NSView {
 /// loop is the only way to get both behaviours from one press.
 final class TabButton: NSButton {
     var bundleIdentifier = ""
+    var tabName = ""
     var onDragMoved: ((TabButton, CGPoint) -> Void)?
     var onDragEnded: ((TabButton) -> Void)?
 
@@ -88,8 +89,8 @@ final class TabStripController: NSObject, NSWindowDelegate {
 
         stack.orientation = .horizontal
         stack.alignment = .centerY
-        stack.spacing = 4
-        stack.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+        stack.spacing = 9
+        stack.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
         stack.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -126,6 +127,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
             let button = TabButton(title: "", target: self, action: #selector(tabClicked(_:)))
             button.tag = index
             button.bundleIdentifier = tab.bundleIdentifier
+            button.tabName = tab.name
             button.imagePosition = .imageLeading
             button.onDragMoved = { [weak self] b, point in self?.dragTab(b, to: point) }
             button.onDragEnded = { [weak self] _ in self?.commitTabOrder() }
@@ -159,24 +161,42 @@ final class TabStripController: NSObject, NSWindowDelegate {
         highlight(activeIndex)
     }
 
-    /// Themed text, with a pill marking the active tab. The stock recessed bezel
+    /// Every tab sits on its own card, not just the active one.
+    ///
+    /// This is what lets the stripes be as bold as they like: the text never
+    /// touches the background, so legibility stops depending on which band happens
+    /// to pass behind a given tab. The stock recessed bezel is no use here -- it
     /// assumes a neutral background and turns muddy over anything coloured.
     private func style(_ button: NSButton, title: String) {
         button.isBordered = false
         button.setButtonType(.momentaryChange)
         button.wantsLayer = true
-        button.layer?.cornerRadius = 6
+        button.layer?.cornerRadius = 7
+        button.layer?.backgroundColor = Theme.current.chip.cgColor
+        button.heightAnchor.constraint(equalToConstant: 26).isActive = true
         button.attributedTitle = NSAttributedString(string: "  \(title)  ", attributes: [
             .foregroundColor: Theme.current.text,
             .font: NSFont.systemFont(ofSize: 12, weight: .medium),
         ])
     }
 
+    /// The active tab is marked by weight, not by a lighter or darker card.
+    ///
+    /// Distinguishing it by card opacity was the obvious approach and it is wrong:
+    /// a translucent card picks up whatever band is behind it, which is the exact
+    /// problem the card exists to solve, and on Rainbow it turns half the tabs
+    /// green and blue. Cards stay solid; the type does the work.
+    private func applyChip(_ button: TabButton, active: Bool) {
+        button.layer?.backgroundColor = Theme.current.chip.cgColor
+        button.attributedTitle = NSAttributedString(string: "  \(button.tabName)  ", attributes: [
+            .foregroundColor: Theme.current.text,
+            .font: NSFont.systemFont(ofSize: 12, weight: active ? .bold : .regular),
+        ])
+    }
+
     private func highlight(_ index: Int?) {
         for (i, button) in buttons.enumerated() {
-            button.layer?.backgroundColor = (i == index)
-                ? Theme.current.pill.cgColor
-                : NSColor.clear.cgColor
+            applyChip(button, active: i == index)
         }
     }
 
