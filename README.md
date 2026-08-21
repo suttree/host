@@ -30,6 +30,11 @@ moves it into the rectangle below the strip, and raises it.
 - **Hiding any tab's app hides the whole workspace**, strip included. Unhiding one
   brings the strip back but not the other four — unhiding one tab should not drag
   everything else onto the screen with it.
+- Drag a tab along the strip to reorder it; the order and the hotkey bindings
+  follow
+- **View › Theme** restyles the tab strip and the Dock icon together. Nine
+  themes: Sunset Stripes, Sunset, Rainbow, Meadow, Brown, Galaxy, Starry Night,
+  Hacker, Silver
 - Dock icon and a **Tabs** menu holding Add Application, Self-test, Show Log and
   Accessibility Settings
 
@@ -78,6 +83,30 @@ keychain; if you renew it, set `IDENTITY` in the Makefile to that instead.
 
 Note this app can never be sandboxed, because the Accessibility API requires an
 unsandboxed process. Developer ID and notarization only — no Mac App Store.
+
+## Themes
+
+`Sources/Theme.swift` holds the palettes; `Sources/IconRenderer.swift` composites
+the line drawing onto one. Both are compiled into the app *and* into the icon
+tool, so the .icns on disk and the icon the app draws at runtime come from the
+same code.
+
+The Dock icon is redrawn in process rather than swapped on disk. Rewriting a
+signed bundle's .icns would break the code signature and take the Accessibility
+grant with it. `NSApplication.applicationIconImage` is an in-memory property
+macOS forgets on relaunch, so the stored theme is re-applied at every launch.
+
+Two details that matter to how it looks:
+
+- On the icon the palette is fitted across the shape exactly **once**. Tiling it
+  makes the pale first band reappear in the bottom-right corner and the sunset
+  stops reading as a sunset. On the strip it tiles, because one pass across
+  something that long would stretch each band into an unreadable smear.
+- The icon is a superellipse, not a rounded rectangle. macOS icon corners are
+  continuous curves and a circular-cornered rect looks wrong beside real icons.
+
+`make icon THEME=galaxy` changes which theme the bundled .icns ships in; the
+running app can switch freely regardless.
 
 ## Decisions worth knowing about
 
@@ -173,6 +202,8 @@ Everything is logged to `~/Library/Logs/Host.log` as well as the in-app log wind
   distinction has already been one real bug.
 - `open -a Host --args --add <bundle-id>` — exercise the add path without driving
   the open panel.
+- `open -a Host --args --theme <id>` — switch theme at launch, for checking them.
+- `open -a Host --args --move-tab <from> <to>` — reorder without a mouse.
 - `open -a Host --args --hide-test` — hide the first tab's app and report which of
   the others followed.
 - `open -a Host --args --bar-preview <path>` — render the tab strip to a PNG, for
@@ -193,8 +224,9 @@ Sources/
   SelfTest.swift       ten-switch drift measurement, log window
   AppDelegate.swift    wiring, status item, permission nag
 tools/make-identity.sh stable self-signed signing identity
-  Sunset.swift         the shared palette and stripe treatment, used by both the
-                       app icon and the tab strip so they cannot drift apart
-tools/icongen/         composites the app icon; `make icon` regenerates AppIcon.icns
+  Theme.swift          palettes and the striped/gradient drawing, shared by the
+                       tab strip and the app icon
+  IconRenderer.swift   masks and crops the line art, composites it onto a theme
+tools/icongen/         writes the .iconset; `make icon` regenerates AppIcon.icns
 Resources/artwork.png  the line drawing, black on white
 ```

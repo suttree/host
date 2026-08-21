@@ -14,10 +14,11 @@ INSTALL := /Applications/$(APP).app
 
 all: $(BUNDLE)
 
-$(BUNDLE): $(SOURCES) Resources/Info.plist Resources/AppIcon.icns Makefile
+$(BUNDLE): $(SOURCES) Resources/Info.plist Resources/AppIcon.icns Resources/artwork.png Makefile
 	@mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources
 	@cp Resources/Info.plist $(BUNDLE)/Contents/Info.plist
 	@cp Resources/AppIcon.icns $(BUNDLE)/Contents/Resources/AppIcon.icns
+	@cp Resources/artwork.png $(BUNDLE)/Contents/Resources/artwork.png
 	swiftc -target $(TARGET) -O -o $(BUNDLE)/Contents/MacOS/$(APP) $(SOURCES)
 ifeq ($(IDENTITY),)
 	@echo "--- signing ad hoc: macOS will revoke Accessibility on every rebuild."
@@ -56,11 +57,14 @@ reset-permission:
 # ARTWORK is black line art on a white ground; it is composited with multiply so
 # the white drops out. Override the path if the source moves.
 ARTWORK ?= Resources/artwork.png
+# Which theme the bundled .icns is drawn in. The running app can switch freely
+# via the View menu; this is only what a fresh install starts as.
+THEME   ?= sunset-stripes
 
 icon:
 	@mkdir -p build
-	@swiftc -o build/icongen tools/icongen/main.swift Sources/Sunset.swift
-	@./build/icongen build/Host.iconset $(ARTWORK)
+	@swiftc -o build/icongen tools/icongen/main.swift Sources/Theme.swift Sources/IconRenderer.swift
+	@./build/icongen build/Host.iconset $(ARTWORK) $(THEME)
 	@iconutil -c icns build/Host.iconset -o Resources/AppIcon.icns
 	@echo "wrote Resources/AppIcon.icns"
 

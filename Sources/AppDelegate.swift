@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Store.save(strip.workspace)
 
         registerHotKeys()
+        apply(theme: Theme.current)
 
         Log.line("host up. tabs: \(strip.workspace.tabs.map(\.name).joined(separator: ", "))")
         Log.line("workspace rect \(NSStringFromRect(strip.workspace.frame))")
@@ -31,6 +32,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if CommandLine.arguments.contains("--cycle") { cycleAllTabs() }
             if CommandLine.arguments.contains("--resize-test") { resizeTest() }
             if CommandLine.arguments.contains("--hide-test") { hideTest() }
+            // `--theme galaxy` switches theme at launch, for checking each one.
+            if let i = CommandLine.arguments.firstIndex(of: "--theme"),
+               i + 1 < CommandLine.arguments.count {
+                let id = CommandLine.arguments[i + 1]
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.apply(theme: Theme.named(id))
+                }
+            }
             // `--move-tab 4 0` exercises the reorder model without a mouse.
             if let i = CommandLine.arguments.firstIndex(of: "--move-tab"),
                i + 2 < CommandLine.arguments.count,
@@ -87,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Carbon hotkeys in HotKeyCenter are what actually do the work.
 
     private var tabsMenu: NSMenu?
+    private var viewMenu: NSMenu?
 
     private func buildMainMenu() {
         let mainMenu = NSMenu()
@@ -100,6 +110,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appItem.submenu = appMenu
         mainMenu.addItem(appItem)
 
+        let viewItem = NSMenuItem()
+        let view = NSMenu(title: "View")
+        viewItem.submenu = view
+        mainMenu.addItem(viewItem)
+        viewMenu = view
+
         let tabsItem = NSMenuItem()
         let tabs = NSMenu(title: "Tabs")
         tabsItem.submenu = tabs
@@ -107,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         tabsMenu = tabs
 
         NSApp.mainMenu = mainMenu
+        rebuildViewMenu()
         rebuildTabsMenu()
     }
 
@@ -137,6 +154,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let ax = NSMenuItem(title: "Accessibility Settings…", action: #selector(openAXSettings), keyEquivalent: "")
         ax.target = self
         menu.addItem(ax)
+    }
+
+    private func rebuildViewMenu() {
+        guard let menu = viewMenu else { return }
+        menu.removeAllItems()
+        let header = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+        for (index, theme) in Theme.all.enumerated() {
+            let item = NSMenuItem(title: theme.name, action: #selector(themeSelected(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = index
+            item.state = theme.id == Theme.current.id ? .on : .off
+            item.indentationLevel = 1
+            menu.addItem(item)
+        }
+    }
+
+    @objc private func themeSelected(_ sender: NSMenuItem) {
+        guard Theme.all.indices.contains(sender.tag) else { return }
+        apply(theme: Theme.all[sender.tag])
+    }
+
+    /// Applies a theme to the strip and the Dock icon, and remembers it.
+    ///
+    /// The Dock icon is drawn in process rather than swapped on disk: rewriting a
+    /// signed bundle's .icns would break the code signature, and with it the
+    /// Accessibility grant. applicationIconImage is an in-memory property that
+    /// macOS forgets on relaunch, so this runs again at every launch.
+    func apply(theme: Theme) {
+        Theme.current = theme
+        strip.applyTheme()
+        rebuildViewMenu()
+        Log.line("theme: \(theme.name)")
+
+        DispatchQueue.main.async {
+            guard let artwork = IconRenderer.fromBundle() else {
+                Log.line("  no artwork in the bundle; Dock icon left alone")
+                return
+            }
+            NSApp.applicationIconImage = IconRenderer.dockImage(theme: theme, artwork: artwork)
+        }
     }
 
     @objc private func tabMenuItem(_ sender: NSMenuItem) { strip.select(index: sender.tag) }

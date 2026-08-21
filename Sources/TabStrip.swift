@@ -27,6 +27,17 @@ final class TabStripPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+/// The tab strip's background, in whatever theme is current.
+///
+/// The palette tiles here rather than being fitted to the shape once, as it is on
+/// the icon: the strip is long and short, so one pass would stretch each band into
+/// an unreadable smear.
+final class ThemeBarView: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        Theme.current.fill(Theme.topRoundedPath(bounds, radius: 9), stripeWidth: 34)
+    }
+}
+
 /// A tab button that distinguishes a click from a drag.
 ///
 /// NSButton's own mouseDown runs a tracking loop and swallows every event until
@@ -72,7 +83,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         self.panel = TabStripPanel(frame: workspace.stripFrame)
         super.init()
 
-        let background = SunsetBarView()
+        let background = ThemeBarView()
         panel.contentView = background
 
         stack.orientation = .horizontal
@@ -148,16 +159,15 @@ final class TabStripController: NSObject, NSWindowDelegate {
         highlight(activeIndex)
     }
 
-    /// Black text on the sunset gradient, with a translucent white pill marking the
-    /// active tab. The stock recessed bezel assumes a neutral background and turns
-    /// muddy over orange.
+    /// Themed text, with a pill marking the active tab. The stock recessed bezel
+    /// assumes a neutral background and turns muddy over anything coloured.
     private func style(_ button: NSButton, title: String) {
         button.isBordered = false
         button.setButtonType(.momentaryChange)
         button.wantsLayer = true
         button.layer?.cornerRadius = 6
         button.attributedTitle = NSAttributedString(string: "  \(title)  ", attributes: [
-            .foregroundColor: NSColor.black,
+            .foregroundColor: Theme.current.text,
             .font: NSFont.systemFont(ofSize: 12, weight: .medium),
         ])
     }
@@ -165,9 +175,16 @@ final class TabStripController: NSObject, NSWindowDelegate {
     private func highlight(_ index: Int?) {
         for (i, button) in buttons.enumerated() {
             button.layer?.backgroundColor = (i == index)
-                ? NSColor(white: 1, alpha: 0.55).cgColor
+                ? Theme.current.pill.cgColor
                 : NSColor.clear.cgColor
         }
+    }
+
+    /// Repaint the strip after the theme changes. The buttons are rebuilt because
+    /// their title colour is baked into an attributed string.
+    func applyTheme() {
+        panel.contentView?.needsDisplay = true
+        rebuild()
     }
 
     // MARK: - Actions
