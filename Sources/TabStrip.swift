@@ -345,6 +345,13 @@ final class TabStripController: NSObject, NSWindowDelegate {
         }
     }
 
+    func selectRelative(offset: Int) {
+        guard let index = relativeTabIndex(activeIndex: activeIndex,
+                                           tabCount: workspace.tabs.count,
+                                           offset: offset) else { return }
+        select(index: index)
+    }
+
     @objc private func addClicked() { addApplication() }
 
     func addApplication() {

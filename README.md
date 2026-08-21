@@ -13,8 +13,9 @@ Then grant Accessibility, click a tab, and run **Tabs › Run Self-test**.
 ## What it does
 
 A floating, non-activating strip at the top of a workspace rectangle. Clicking a
-tab (or pressing `⌥1` / `⌥2`) launches the app if needed, finds its main window,
-moves it into the rectangle below the strip, and raises it.
+tab or pressing `⌥1` through `⌥9` launches the app if needed, finds its main
+window, moves it into the rectangle below the strip, and raises it. `⌥⇧[` and
+`⌥⇧]` move to the previous and next apps, wrapping at either end.
 
 - `+` adds an app from `/Applications`, persisted to
   `~/Library/Application Support/Host/workspace.json`. The new tab is selected

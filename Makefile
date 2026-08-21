@@ -7,7 +7,7 @@ TARGET   := arm64-apple-macosx13.0
 # accepts it regardless, which is all we need.
 IDENTITY ?= $(shell security find-identity -p codesigning 2>/dev/null | grep -o '"Host Dev"' | head -1 | tr -d '"')
 
-.PHONY: all run install clean identity icon reset-permission
+.PHONY: all run install test clean identity icon reset-permission
 
 LSREG   := /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 INSTALL := /Applications/$(APP).app
@@ -47,6 +47,11 @@ install: $(BUNDLE)
 
 run: install
 	@open $(INSTALL)
+
+test:
+	@mkdir -p build
+	@swiftc -o build/tab-navigation-tests Sources/TabNavigation.swift Tests/TabNavigationTests.swift
+	@build/tab-navigation-tests
 
 # Clears a stale grant when macOS has the app ticked but window calls still fail.
 # The app will prompt again on next launch.

@@ -41,6 +41,15 @@ final class HotKeyCenter {
                  handler: handler)
     }
 
+    func registerOptionShiftBrackets(previous: @escaping () -> Void,
+                                     next: @escaping () -> Void) {
+        let modifiers = UInt32(optionKey | shiftKey)
+        register(keyCode: UInt32(kVK_ANSI_LeftBracket), modifiers: modifiers,
+                 id: 100, handler: previous)
+        register(keyCode: UInt32(kVK_ANSI_RightBracket), modifiers: modifiers,
+                 id: 101, handler: next)
+    }
+
     func register(keyCode: UInt32, modifiers: UInt32, id: UInt32, handler: @escaping () -> Void) {
         installHandlerIfNeeded()
         handlers[id] = handler

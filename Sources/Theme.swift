@@ -23,18 +23,18 @@ struct Theme {
     /// than of whichever band happens to pass behind a given tab.
     let text: NSColor
     let chip: NSColor
-    /// Scattered dots and stars, for the night skies.
-    let stars: Bool
+    /// A stable seed for scattered dots and stars. Nil leaves the surface clear.
+    let starSeed: UInt64?
 
     init(id: String, name: String, style: ThemeStyle, ink: NSColor,
-         text: NSColor, chip: NSColor, stars: Bool = false) {
+         text: NSColor, chip: NSColor, starSeed: UInt64? = nil) {
         self.id = id
         self.name = name
         self.style = style
         self.ink = ink
         self.text = text
         self.chip = chip
-        self.stars = stars
+        self.starSeed = starSeed
     }
 
     // MARK: - Drawing
@@ -94,21 +94,21 @@ struct Theme {
             context.restoreGraphicsState()
         }
 
-        if stars { scatterStars(in: path) }
+        if let starSeed { scatterStars(in: path, seed: starSeed) }
     }
 
     /// Deterministic, so the icon does not shimmer between redraws.
-    private func scatterStars(in path: NSBezierPath) {
+    private func scatterStars(in path: NSBezierPath, seed initialSeed: UInt64) {
         guard let context = NSGraphicsContext.current else { return }
         context.saveGraphicsState()
         path.addClip()
         let bounds = path.bounds
-        var seed: UInt64 = 0x5EED
+        var seed = initialSeed
         func random() -> CGFloat {
             seed = seed &* 6364136223846793005 &+ 1442695040888963407
             return CGFloat((seed >> 33) % 100_000) / 100_000
         }
-        let count = Int((bounds.width * bounds.height) / 2600)
+        let count = Int((bounds.width * bounds.height) / 2000)
         for index in 0..<count {
             let x = bounds.minX + random() * bounds.width
             let y = bounds.minY + random() * bounds.height
@@ -215,14 +215,14 @@ extension Theme {
                                rgb(0.16, 0.08, 0.33), rgb(0.13, 0.06, 0.26), rgb(0.09, 0.04, 0.19),
                                rgb(0.06, 0.03, 0.13)]),
               ink: rgb(0.93, 0.88, 1.00), text: rgb(0.95, 0.92, 1.00),
-              chip: rgb(0.13, 0.07, 0.26), stars: true),
+              chip: rgb(0.13, 0.07, 0.26), starSeed: 0x5EED),
 
         Theme(id: "starry-night", name: "Starry Night",
               style: .stripes([rgb(0.16, 0.28, 0.53), rgb(0.12, 0.23, 0.46), rgb(0.09, 0.19, 0.39),
                                rgb(0.14, 0.26, 0.49), rgb(0.10, 0.21, 0.41), rgb(0.07, 0.16, 0.31),
                                rgb(0.05, 0.12, 0.25)]),
               ink: rgb(0.96, 0.83, 0.42), text: rgb(0.98, 0.90, 0.62),
-              chip: rgb(0.06, 0.13, 0.27), stars: true),
+              chip: rgb(0.06, 0.13, 0.27), starSeed: 0x57A22),
 
         Theme(id: "hacker", name: "Hacker",
               style: .stripes([rgb(0.05, 0.13, 0.06), rgb(0.03, 0.09, 0.04), rgb(0.06, 0.16, 0.07),

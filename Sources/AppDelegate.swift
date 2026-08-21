@@ -103,8 +103,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.strip.select(index: index)
             }
         }
+        HotKeyCenter.shared.registerOptionShiftBrackets(
+            previous: { [weak self] in self?.strip.selectRelative(offset: -1) },
+            next: { [weak self] in self?.strip.selectRelative(offset: 1) }
+        )
         rebuildTabsMenu()
-        Log.line("hotkeys: option-1 .. option-\(strip.workspace.tabs.count)")
+        Log.line("hotkeys: option-1 .. option-\(strip.workspace.tabs.count), option-shift-[ and option-shift-]")
     }
 
     /// Clicking the Dock icon brings the whole workspace back, not just the strip.
@@ -163,6 +167,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(item)
         }
         menu.addItem(.separator())
+        let previous = NSMenuItem(title: "Previous Application", action: #selector(previousTab), keyEquivalent: "[")
+        previous.keyEquivalentModifierMask = [.option, .shift]
+        previous.target = self
+        menu.addItem(previous)
+        let next = NSMenuItem(title: "Next Application", action: #selector(nextTab), keyEquivalent: "]")
+        next.keyEquivalentModifierMask = [.option, .shift]
+        next.target = self
+        menu.addItem(next)
+        menu.addItem(.separator())
         let add = NSMenuItem(title: "Add Application…", action: #selector(addApplication), keyEquivalent: "t")
         add.target = self
         menu.addItem(add)
@@ -204,6 +217,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard Theme.all.indices.contains(sender.tag) else { return }
         apply(theme: Theme.all[sender.tag])
     }
+
+    @objc private func previousTab() { strip.selectRelative(offset: -1) }
+    @objc private func nextTab() { strip.selectRelative(offset: 1) }
 
     func apply(theme: Theme) {
         Theme.current = theme
