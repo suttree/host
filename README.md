@@ -13,8 +13,9 @@ Then grant Accessibility, click a tab, and run **Tabs › Run Self-test**.
 ## What it does
 
 A floating, non-activating strip at the top of a workspace rectangle. Clicking a
-tab (or pressing `⌥1` / `⌥2`) launches the app if needed, finds its main window,
-moves it into the rectangle below the strip, and raises it.
+tab or pressing `⌥1` through `⌥9` launches the app if needed, finds its main
+window, moves it into the rectangle below the strip, and raises it. `⌥⇧[` and
+`⌥⇧]` move to the previous and next apps, wrapping at either end.
 
 - `+` adds an app from `/Applications`, persisted to
   `~/Library/Application Support/Host/workspace.json`. The new tab is selected
@@ -31,6 +32,8 @@ moves it into the rectangle below the strip, and raises it.
 - **Hiding any tab's app hides the whole workspace**, strip included. Unhiding one
   brings the strip back but not the other four — unhiding one tab should not drag
   everything else onto the screen with it.
+- Show Desktop sweeps the strip aside with the hosted windows and restores them
+  together.
 - Drag a tab along the strip to reorder it; the order and the hotkey bindings
   follow
 - The **cog** at the right of the strip opens settings: pick the tab bar theme
@@ -117,11 +120,9 @@ lets the stripes be as bold as they like: text never touches the background, so
 legibility stops depending on which band happens to pass behind a given tab.
 Rainbow is the case that proves it.
 
-The active tab gets a solid card and bold type; the rest are translucent, so only
-the tab you are on reads as fully opaque. The translucent cards do pick up a tint
-from the band behind them -- on Rainbow a tab can end up sitting on green or blue
--- which is a deliberate trade for the lighter look. Text stays legible either
-way, and the weight marks the active tab independently of the background.
+The active tab gets bold type and stays fully opaque. Inactive tabs fade to 52%
+as a complete unit, including the icon, label and card, so the current app is
+obvious without changing the tab layout.
 
 Two details that matter to how it looks:
 
