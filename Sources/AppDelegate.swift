@@ -116,17 +116,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func registerHotKeys() {
         HotKeyCenter.shared.unregisterAll()
-        for index in strip.workspace.tabs.indices {
-            HotKeyCenter.shared.registerOptionDigit(index: index) { [weak self] in
-                self?.strip.select(index: index)
-            }
-        }
         HotKeyCenter.shared.registerOptionShiftBrackets(
             previous: { [weak self] in self?.strip.selectRelative(offset: -1) },
             next: { [weak self] in self?.strip.selectRelative(offset: 1) }
         )
         rebuildTabsMenu()
-        Log.line("hotkeys: option-1 .. option-\(strip.workspace.tabs.count), option-shift-[ and option-shift-]")
+        Log.line("hotkeys: option-shift-[ and option-shift-]")
     }
 
     /// Clicking the Dock icon brings the whole workspace back, not just the strip.
@@ -177,9 +172,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildTabsMenu() {
         guard let menu = tabsMenu, let strip else { return }
         menu.removeAllItems()
-        for (index, tab) in strip.workspace.tabs.enumerated() where index < 9 {
-            let item = NSMenuItem(title: tab.name, action: #selector(tabMenuItem(_:)), keyEquivalent: "\(index + 1)")
-            item.keyEquivalentModifierMask = [.option]
+        for (index, tab) in strip.workspace.tabs.enumerated() {
+            let item = NSMenuItem(title: tab.name, action: #selector(tabMenuItem(_:)), keyEquivalent: "")
             item.target = self
             item.tag = index
             menu.addItem(item)

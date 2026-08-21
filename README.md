@@ -13,9 +13,9 @@ Then grant Accessibility, click a tab, and run **Tabs › Run Self-test**.
 ## What it does
 
 A floating, non-activating strip at the top of a workspace rectangle. Clicking a
-tab or pressing `⌥1` through `⌥9` launches the app if needed, finds its main
-window, moves it into the rectangle below the strip, and raises it. `⌥⇧[` and
-`⌥⇧]` move to the previous and next apps, wrapping at either end.
+tab launches the app if needed, finds its main window, moves it into the rectangle
+below the strip, and raises it. `⌥⇧[` and `⌥⇧]` move to the previous and next
+apps, wrapping at either end.
 
 - `+` adds an app from `/Applications`, persisted to
   `~/Library/Application Support/Host/workspace.json`. The new tab is selected
@@ -145,11 +145,9 @@ drawn over anything we could put back there, so that window would be invisible �
 and it would sit in the z-order fighting the app it just raised. All that is
 actually needed is a rectangle and a floating strip. `Workspace` is the rectangle.
 
-**Option, not Command.** `⌘1`–`⌘9` are already spoken for in most apps. A
-switcher that fights the app it just brought forward is worse than no switcher.
-Control-digit was the first choice and silently does not work: macOS reserves it
-for Mission Control's "Switch to Desktop N" and consumes the event before any
-Carbon hotkey sees it, while registration still reports success.
+**No digit shortcuts.** Host does not claim Command, Control or Option with the
+number row. Those combinations belong to apps, Mission Control and keyboard
+layouts. Option-3 must remain available for typing `#`, for example.
 
 **Carbon `RegisterEventHotKey`, not `NSEvent.addGlobalMonitorForEvents`.** A
 global monitor can observe a keystroke but cannot consume it, so the frontmost app
