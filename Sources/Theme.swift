@@ -11,6 +11,10 @@ enum ThemeStyle {
     case packedCircles(background: NSColor, circles: [NSColor], seed: UInt64)
     case triangles([NSColor], seed: UInt64)
     case sunflowers(background: NSColor, petals: [NSColor], centre: NSColor)
+    case diamonds(background: NSColor, diamonds: [NSColor])
+    case waves(background: NSColor, waves: [NSColor])
+    case bubbles(background: NSColor, bubbles: [NSColor], seed: UInt64)
+    case radial([NSColor])
 }
 
 struct Theme {
@@ -106,6 +110,28 @@ struct Theme {
         case .sunflowers(let background, let petals, let centre):
             drawSunflowers(in: path, background: background, petals: petals,
                            centre: centre, tiled: stripeWidth != nil)
+        case .diamonds(let background, let diamonds):
+            drawDiamonds(in: path, background: background, colours: diamonds,
+                         tiled: stripeWidth != nil)
+        case .waves(let background, let waves):
+            drawWaves(in: path, background: background, colours: waves,
+                      tiled: stripeWidth != nil)
+        case .bubbles(let background, let bubbles, let seed):
+            drawBubbles(in: path, background: background, colours: bubbles,
+                        seed: seed, tiled: stripeWidth != nil)
+        case .radial(let colours):
+            guard let context = NSGraphicsContext.current else { return }
+            context.saveGraphicsState()
+            path.addClip()
+            let locations = (0..<colours.count).map { CGFloat($0) / CGFloat(max(1, colours.count - 1)) }
+            locations.withUnsafeBufferPointer {
+                let gradient = NSGradient(colors: colours, atLocations: $0.baseAddress, colorSpace: .sRGB)
+                let bounds = path.bounds
+                gradient?.draw(fromCenter: CGPoint(x: bounds.midX * 0.82, y: bounds.midY * 1.18),
+                               radius: 0, toCenter: CGPoint(x: bounds.midX, y: bounds.midY),
+                               radius: hypot(bounds.width, bounds.height) * 0.62, options: [])
+            }
+            context.restoreGraphicsState()
         }
 
         if let starSeed { scatterStars(in: path, seed: starSeed) }
@@ -236,6 +262,79 @@ struct Theme {
                 }
                 row += 1
                 y += spacing
+            }
+        }
+    }
+
+    private func drawDiamonds(in path: NSBezierPath, background: NSColor,
+                              colours: [NSColor], tiled: Bool) {
+        clipped(path, background: background) { bounds in
+            let width = tiled ? CGFloat(34) : bounds.width / 5
+            let height = width * 0.72
+            var row = 0
+            var y = bounds.minY - height
+            while y < bounds.maxY + height {
+                var column = 0
+                var x = bounds.minX - width + (row.isMultiple(of: 2) ? 0 : width / 2)
+                while x < bounds.maxX + width {
+                    colours[(row + column) % colours.count].setFill()
+                    let diamond = NSBezierPath()
+                    diamond.move(to: CGPoint(x: x, y: y + height / 2))
+                    diamond.line(to: CGPoint(x: x + width / 2, y: y + height))
+                    diamond.line(to: CGPoint(x: x + width, y: y + height / 2))
+                    diamond.line(to: CGPoint(x: x + width / 2, y: y))
+                    diamond.close()
+                    diamond.fill()
+                    column += 1
+                    x += width
+                }
+                row += 1
+                y += height / 2
+            }
+        }
+    }
+
+    private func drawWaves(in path: NSBezierPath, background: NSColor,
+                           colours: [NSColor], tiled: Bool) {
+        clipped(path, background: background) { bounds in
+            let spacing = tiled ? CGFloat(13) : bounds.height / 11
+            let amplitude = spacing * 0.42
+            for row in -2...Int(bounds.height / spacing) + 2 {
+                let wave = NSBezierPath()
+                wave.lineWidth = max(2, spacing * 0.52)
+                var x = bounds.minX - 10
+                while x <= bounds.maxX + 10 {
+                    let y = bounds.minY + CGFloat(row) * spacing
+                        + sin((x - bounds.minX) / spacing * .pi) * amplitude
+                    if x == bounds.minX - 10 { wave.move(to: CGPoint(x: x, y: y)) }
+                    else { wave.line(to: CGPoint(x: x, y: y)) }
+                    x += 4
+                }
+                colours[(row + colours.count * 2) % colours.count].setStroke()
+                wave.stroke()
+            }
+        }
+    }
+
+    private func drawBubbles(in path: NSBezierPath, background: NSColor,
+                             colours: [NSColor], seed initialSeed: UInt64, tiled: Bool) {
+        clipped(path, background: background) { bounds in
+            var seed = initialSeed
+            func random() -> CGFloat {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return CGFloat((seed >> 33) % 100_000) / 100_000
+            }
+            let scale = tiled ? max(bounds.height, 44) : bounds.width
+            let count = max(24, Int(bounds.width * bounds.height / (scale * scale) * 120))
+            for bubble in 0..<count {
+                let radius = scale * (0.012 + random() * 0.055)
+                let x = bounds.minX + random() * bounds.width
+                let y = bounds.minY + random() * bounds.height
+                let circle = NSBezierPath(ovalIn: CGRect(x: x - radius, y: y - radius,
+                                                         width: radius * 2, height: radius * 2))
+                circle.lineWidth = max(1, radius * 0.18)
+                colours[bubble % colours.count].setStroke()
+                circle.stroke()
             }
         }
     }
@@ -427,6 +526,51 @@ extension Theme {
                                  rgb(0.19, 0.68, 0.62), rgb(0.16, 0.43, 0.68), rgb(0.39, 0.24, 0.59)],
                                 seed: 0xDE1A0A7),
               ink: rgb(0.08, 0.08, 0.12), text: rgb(0.10, 0.08, 0.12), chip: rgb(0.98, 0.94, 0.86)),
+
+        Theme(id: "harlequin", name: "Harlequin",
+              style: .diamonds(background: rgb(0.08, 0.07, 0.11),
+                               diamonds: [rgb(0.93, 0.10, 0.20), rgb(0.98, 0.72, 0.08),
+                                          rgb(0.08, 0.56, 0.49), rgb(0.20, 0.30, 0.74)]),
+              ink: rgb(0.98, 0.94, 0.82), text: rgb(0.98, 0.94, 0.82), chip: rgb(0.10, 0.09, 0.13)),
+
+        Theme(id: "sunrise", name: "Sunrise",
+              style: .gradient([rgb(0.24, 0.18, 0.45), rgb(0.76, 0.30, 0.45), rgb(0.98, 0.52, 0.34),
+                                rgb(1.00, 0.79, 0.42), rgb(0.98, 0.92, 0.68)]),
+              ink: rgb(0.24, 0.10, 0.16), text: rgb(0.24, 0.10, 0.16), chip: rgb(1.00, 0.90, 0.72)),
+
+        Theme(id: "lavender", name: "Lavender",
+              style: .gradient([rgb(0.94, 0.91, 0.98), rgb(0.79, 0.69, 0.91), rgb(0.57, 0.43, 0.76),
+                                rgb(0.34, 0.25, 0.52)]),
+              ink: rgb(0.20, 0.13, 0.32), text: rgb(0.20, 0.13, 0.32), chip: rgb(0.95, 0.91, 0.98)),
+
+        Theme(id: "fern", name: "Fern",
+              style: .triangles([rgb(0.04, 0.18, 0.10), rgb(0.08, 0.30, 0.16), rgb(0.12, 0.44, 0.22),
+                                 rgb(0.27, 0.58, 0.30), rgb(0.55, 0.70, 0.38)], seed: 0xFE2A),
+              ink: rgb(0.84, 0.93, 0.65), text: rgb(0.88, 0.95, 0.72), chip: rgb(0.05, 0.22, 0.12)),
+
+        Theme(id: "heather", name: "Heather",
+              style: .packedCircles(background: rgb(0.19, 0.15, 0.24),
+                                    circles: [rgb(0.50, 0.35, 0.58), rgb(0.67, 0.46, 0.68),
+                                              rgb(0.78, 0.61, 0.76), rgb(0.38, 0.45, 0.36)],
+                                    seed: 0x4EA74E2),
+              ink: rgb(0.93, 0.85, 0.91), text: rgb(0.94, 0.88, 0.93), chip: rgb(0.26, 0.19, 0.31)),
+
+        Theme(id: "water", name: "Water",
+              style: .waves(background: rgb(0.05, 0.26, 0.43),
+                            waves: [rgb(0.10, 0.42, 0.65), rgb(0.16, 0.58, 0.76),
+                                    rgb(0.40, 0.76, 0.85), rgb(0.76, 0.91, 0.91)]),
+              ink: rgb(0.88, 0.98, 1.00), text: rgb(0.90, 0.98, 1.00), chip: rgb(0.04, 0.29, 0.46)),
+
+        Theme(id: "sparkling-water", name: "Sparkling Water",
+              style: .bubbles(background: rgb(0.66, 0.90, 0.91),
+                              bubbles: [rgb(0.94, 1.00, 1.00), rgb(0.24, 0.67, 0.72), rgb(0.08, 0.48, 0.58)],
+                              seed: 0xBABB1E5),
+              ink: rgb(0.04, 0.30, 0.36), text: rgb(0.03, 0.24, 0.29), chip: rgb(0.91, 0.98, 0.97)),
+
+        Theme(id: "supernova", name: "Supernova",
+              style: .radial([rgb(1.00, 0.98, 0.72), rgb(1.00, 0.68, 0.16), rgb(0.94, 0.20, 0.17),
+                              rgb(0.49, 0.10, 0.46), rgb(0.08, 0.04, 0.19)]),
+              ink: .white, text: .white, chip: rgb(0.16, 0.05, 0.20), starSeed: 0x5A9E2A0A),
 
         Theme(id: "silver", name: "Silver",
               style: .stripes([rgb(0.97, 0.97, 0.98), rgb(0.91, 0.92, 0.94), rgb(0.84, 0.86, 0.89),

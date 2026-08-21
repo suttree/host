@@ -7,8 +7,11 @@ struct ThemeRenderingTests {
         assert(Set(ids).count == ids.count)
 
         let added = Set(["mushroom", "beige", "dune", "starship", "vim", "sunflowers",
-                         "silver-black", "polka-dots", "circle-packing", "delaunay-triangles"])
+                         "silver-black", "polka-dots", "circle-packing", "delaunay-triangles",
+                         "harlequin", "sunrise", "lavender", "fern", "heather", "water",
+                         "sparkling-water", "supernova"])
         assert(added.isSubset(of: Set(ids)))
+        assert(Theme.all.count == 27)
 
         for theme in Theme.all {
             assert(theme.swatch(size: NSSize(width: 420, height: 46)).tiffRepresentation != nil)
