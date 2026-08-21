@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                  (Theme.iconFollowsTheme ? " (matched)" : " (chosen)"))
 
         if !AXPermission.isTrusted {
+            strip.raiseStrip()
             AXPermission.requestIfNeeded()
             nagAboutPermission()
         } else {
@@ -103,6 +104,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     let name = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?
                         .deletingPathExtension().lastPathComponent ?? id
                     self.strip.addTab(name: name, bundleIdentifier: id)
+                }
+            }
+            if !CommandLine.arguments.dropFirst().contains(where: { $0.hasPrefix("--") }) {
+                DispatchQueue.main.async {
+                    self.strip.restoreLastActiveTab()
                 }
             }
         }
