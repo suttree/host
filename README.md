@@ -31,6 +31,8 @@ window, moves it into the rectangle below the strip, and raises it. `⌥⇧[` an
 - **Hiding any tab's app hides the whole workspace**, strip included. Unhiding one
   brings the strip back but not the other four — unhiding one tab should not drag
   everything else onto the screen with it.
+- Show Desktop sweeps the strip aside with the hosted windows and restores them
+  together.
 - Drag a tab along the strip to reorder it; the order and the hotkey bindings
   follow
 - The **cog** at the right of the strip opens settings: pick the tab bar theme

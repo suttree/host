@@ -5,8 +5,8 @@ import Cocoa
 /// Non-activating matters: clicking a tab must not make Host the frontmost
 /// application, because the whole point of the click is to make some *other*
 /// application frontmost. .floating keeps the strip above the app window we just
-/// raised, and .stationary + .canJoinAllSpaces stop it sliding around during
-/// Mission Control transitions.
+/// raised. .managed lets Mission Control sweep it aside with the hosted window,
+/// while .canJoinAllSpaces keeps the workspace available on every Space.
 final class TabStripPanel: NSPanel {
     init(frame: CGRect) {
         super.init(contentRect: frame,
@@ -15,7 +15,7 @@ final class TabStripPanel: NSPanel {
                    defer: false)
         isFloatingPanel = true
         level = .floating
-        collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenNone]
+        collectionBehavior = [.canJoinAllSpaces, .managed, .fullScreenNone]
         hidesOnDeactivate = false
         isMovableByWindowBackground = true
         backgroundColor = .clear
