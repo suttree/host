@@ -34,7 +34,7 @@ final class TabStripPanel: NSPanel {
 /// an unreadable smear.
 final class ThemeBarView: NSView {
     override func draw(_ dirtyRect: NSRect) {
-        Theme.current.fill(Theme.topRoundedPath(bounds, radius: 9), stripeWidth: 34)
+        Theme.current.fill(Theme.topRoundedPath(bounds, radius: 10), stripeWidth: 34)
     }
 }
 
@@ -94,28 +94,28 @@ final class TabStripController: NSObject, NSWindowDelegate {
         cog.imagePosition = .imageOnly
         cog.isBordered = false
         cog.wantsLayer = true
-        cog.layer?.cornerRadius = 7
+        cog.layer?.cornerRadius = 8
         cog.target = self
         cog.action = #selector(cogClicked)
         cog.toolTip = "Theme and app icon"
         cog.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(cog)
         NSLayoutConstraint.activate([
-            cog.trailingAnchor.constraint(equalTo: background.trailingAnchor, constant: -10),
+            cog.trailingAnchor.constraint(equalTo: background.trailingAnchor, constant: -12),
             cog.centerYAnchor.constraint(equalTo: background.centerYAnchor),
-            cog.widthAnchor.constraint(equalToConstant: 28),
-            cog.heightAnchor.constraint(equalToConstant: 26),
+            cog.widthAnchor.constraint(equalToConstant: 32),
+            cog.heightAnchor.constraint(equalToConstant: 30),
         ])
 
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 9
-        stack.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
+        stack.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         stack.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: background.leadingAnchor),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: background.trailingAnchor, constant: -46),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: background.trailingAnchor, constant: -52),
             stack.centerYAnchor.constraint(equalTo: background.centerYAnchor),
         ])
 
@@ -198,9 +198,9 @@ final class TabStripController: NSObject, NSWindowDelegate {
         button.isBordered = false
         button.setButtonType(.momentaryChange)
         button.wantsLayer = true
-        button.layer?.cornerRadius = 7
+        button.layer?.cornerRadius = 8
         button.layer?.backgroundColor = Theme.current.chip.withAlphaComponent(0.55).cgColor
-        button.heightAnchor.constraint(equalToConstant: 26).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 30).isActive = true
         button.attributedTitle = NSAttributedString(string: "  \(title)  ", attributes: [
             .foregroundColor: Theme.current.text,
             .font: NSFont.systemFont(ofSize: 12, weight: .medium),

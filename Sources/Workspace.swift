@@ -21,7 +21,10 @@ struct AppTab: Codable, Equatable {
 struct Workspace: Codable {
     var tabs: [AppTab]
     var frameString: String
-    var stripHeight: CGFloat = 38
+    /// Computed, not stored, so it stays out of the JSON. It is chrome metrics
+    /// rather than workspace state, and persisting it meant a saved file pinned
+    /// every existing install to the old height.
+    var stripHeight: CGFloat { 46 }
 
     var frame: CGRect {
         get { NSRectFromString(frameString) }
