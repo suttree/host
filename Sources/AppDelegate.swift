@@ -20,6 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.line("host up. tabs: \(strip.workspace.tabs.map(\.name).joined(separator: ", "))")
         Log.line("workspace rect \(NSStringFromRect(strip.workspace.frame))")
         Log.line("accessibility trusted: \(AXPermission.isTrusted)")
+        Log.line("theme: \(Theme.current.name)  icon: \(Theme.iconTheme.name)" +
+                 (Theme.iconFollowsTheme ? " (matched)" : " (chosen)"))
 
         if !AXPermission.isTrusted {
             AXPermission.requestIfNeeded()
@@ -32,6 +34,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if CommandLine.arguments.contains("--cycle") { cycleAllTabs() }
             if CommandLine.arguments.contains("--resize-test") { resizeTest() }
             if CommandLine.arguments.contains("--hide-test") { hideTest() }
+            if let i = CommandLine.arguments.firstIndex(of: "--settings-preview"),
+               i + 1 < CommandLine.arguments.count {
+                let path = CommandLine.arguments[i + 1]
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    self.showSettings()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        guard let view = SettingsWindowController.shared.window?.contentView,
+                              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+                        view.cacheDisplay(in: view.bounds, to: rep)
+                        try? rep.representation(using: .png, properties: [:])?
+                            .write(to: URL(fileURLWithPath: path))
+                        Log.line("wrote settings preview to \(path)")
+                    }
+                }
+            }
             // `--theme galaxy` switches theme at launch, for checking each one.
             if let i = CommandLine.arguments.firstIndex(of: "--theme"),
                i + 1 < CommandLine.arguments.count {
@@ -147,6 +164,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let log = NSMenuItem(title: "Show Log", action: #selector(showLog), keyEquivalent: "l")
         log.target = self
         menu.addItem(log)
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
         menu.addItem(.separator())
         let diag = NSMenuItem(title: "Diagnose Tabs", action: #selector(diagnoseTabs), keyEquivalent: "")
         diag.target = self
@@ -177,32 +197,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         apply(theme: Theme.all[sender.tag])
     }
 
-    /// Applies a theme to the strip and the Dock icon, and remembers it.
+    func apply(theme: Theme) {
+        Theme.current = theme
+        Log.line("theme: \(theme.name)")
+        refreshAppearance()
+    }
+
+    func apply(iconTheme: Theme) {
+        Theme.setIconTheme(iconTheme)
+        Log.line("icon theme: \(iconTheme.name)")
+        refreshAppearance()
+    }
+
+    /// Repaints the strip and redraws the Dock icon from whatever is stored.
     ///
     /// The Dock icon is drawn in process rather than swapped on disk: rewriting a
     /// signed bundle's .icns would break the code signature, and with it the
     /// Accessibility grant. applicationIconImage is an in-memory property that
     /// macOS forgets on relaunch, so this runs again at every launch.
-    func apply(theme: Theme) {
-        Theme.current = theme
+    func refreshAppearance() {
         strip.applyTheme()
         rebuildViewMenu()
-        Log.line("theme: \(theme.name)")
+        SettingsWindowController.shared.refresh()
 
         DispatchQueue.main.async {
             guard let artwork = IconRenderer.fromBundle() else {
                 Log.line("  no artwork in the bundle; Dock icon left alone")
                 return
             }
-            NSApp.applicationIconImage = IconRenderer.dockImage(theme: theme, artwork: artwork)
+            NSApp.applicationIconImage = IconRenderer.dockImage(theme: Theme.iconTheme, artwork: artwork)
         }
     }
+
+    func showSettings() { SettingsWindowController.shared.show() }
 
     @objc private func tabMenuItem(_ sender: NSMenuItem) { strip.select(index: sender.tag) }
     @objc private func addApplication() { strip.addApplication() }
     @objc private func runSelfTest() { SelfTest.run(controller: strip) }
     @objc private func showLog() { LogWindow.shared.show() }
     @objc private func openAXSettings() { AXPermission.openSettings() }
+    @objc private func openSettings() { showSettings() }
     @objc private func diagnoseTabs() { LogWindow.shared.show(); diagnose() }
 
     /// Read-only. Reports what each configured app exposes over AX without

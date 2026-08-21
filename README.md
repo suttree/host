@@ -32,9 +32,12 @@ moves it into the rectangle below the strip, and raises it.
   everything else onto the screen with it.
 - Drag a tab along the strip to reorder it; the order and the hotkey bindings
   follow
-- **View › Theme** restyles the tab strip and the Dock icon together. Nine
-  themes: Sunset Stripes, Sunset, Rainbow, Meadow, Brown, Galaxy, Starry Night,
-  Hacker, Silver
+- The **cog** at the right of the strip opens settings: pick the tab bar theme
+  and the app icon from nine themes — Sunset Stripes, Sunset, Rainbow, Meadow,
+  Brown, Galaxy, Starry Night, Hacker, Silver. The icon matches the theme by
+  default; click any icon to break the link and choose independently.
+  Also on View › Theme and Tabs › Settings (command-comma), for when Host
+  happens to be frontmost
 - Dock icon and a **Tabs** menu holding Add Application, Self-test, Show Log and
   Accessibility Settings
 
@@ -83,6 +86,17 @@ keychain; if you renew it, set `IDENTITY` in the Makefile to that instead.
 
 Note this app can never be sandboxed, because the Accessibility API requires an
 unsandboxed process. Developer ID and notarization only — no Mac App Store.
+
+## Why settings are on the strip, not just in the menu bar
+
+The menu bar belongs to whichever app is frontmost, and clicking a tab makes that
+some other app immediately — so Host's own menus are unreachable in practice.
+Anything you need while using Host has to be on the strip itself. The menu items
+still exist and work when Host does happen to be frontmost; they just cannot be
+the only way in.
+
+The settings window is deliberately not modal: you want the strip restyling
+itself behind it as you click through the themes.
 
 ## Themes
 
@@ -239,6 +253,7 @@ tools/make-identity.sh stable self-signed signing identity
   Theme.swift          palettes and the striped/gradient drawing, shared by the
                        tab strip and the app icon
   IconRenderer.swift   masks and crops the line art, composites it onto a theme
+  SettingsWindow.swift the theme and app icon pickers, opened from the cog
 tools/icongen/         writes the .iconset; `make icon` regenerates AppIcon.icns
 Resources/artwork.png  the line drawing, black on white
 ```

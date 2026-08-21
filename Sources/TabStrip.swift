@@ -76,6 +76,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
     private(set) var workspace: Workspace
     private let panel: TabStripPanel
     private let stack = NSStackView()
+    private let cog = NSButton()
     private var buttons: [TabButton] = []
     private(set) var activeIndex: Int?
 
@@ -87,6 +88,25 @@ final class TabStripController: NSObject, NSWindowDelegate {
         let background = ThemeBarView()
         panel.contentView = background
 
+        // Pinned to the trailing edge rather than added to the stack, so it stays
+        // at the far right however many tabs there are.
+        cog.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: "Settings")
+        cog.imagePosition = .imageOnly
+        cog.isBordered = false
+        cog.wantsLayer = true
+        cog.layer?.cornerRadius = 7
+        cog.target = self
+        cog.action = #selector(cogClicked)
+        cog.toolTip = "Theme and app icon"
+        cog.translatesAutoresizingMaskIntoConstraints = false
+        background.addSubview(cog)
+        NSLayoutConstraint.activate([
+            cog.trailingAnchor.constraint(equalTo: background.trailingAnchor, constant: -10),
+            cog.centerYAnchor.constraint(equalTo: background.centerYAnchor),
+            cog.widthAnchor.constraint(equalToConstant: 28),
+            cog.heightAnchor.constraint(equalToConstant: 26),
+        ])
+
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 9
@@ -95,7 +115,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         background.addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: background.leadingAnchor),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: background.trailingAnchor),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: background.trailingAnchor, constant: -46),
             stack.centerYAnchor.constraint(equalTo: background.centerYAnchor),
         ])
 
@@ -159,6 +179,13 @@ final class TabStripController: NSObject, NSWindowDelegate {
         stack.addArrangedSubview(add)
 
         highlight(activeIndex)
+
+        cog.layer?.backgroundColor = Theme.current.chip.withAlphaComponent(0.55).cgColor
+        cog.contentTintColor = Theme.current.text
+    }
+
+    @objc private func cogClicked() {
+        AppDelegate.shared?.showSettings()
     }
 
     /// Every tab sits on its own card, not just the active one.

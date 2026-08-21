@@ -225,11 +225,51 @@ extension Theme {
     }
 
     // MARK: - Persistence
+    //
+    // The strip's theme and the icon's theme are stored separately, so a Hacker
+    // strip can sit under a Sunset icon. By default the icon follows the strip;
+    // choosing an icon explicitly breaks the link.
 
     private static let key = "HostTheme"
+    private static let iconKey = "HostIconTheme"
+    private static let linkKey = "HostIconFollowsTheme"
 
     static var current: Theme {
         get { named(UserDefaults.standard.string(forKey: key)) }
         set { UserDefaults.standard.set(newValue.id, forKey: key) }
+    }
+
+    static var iconFollowsTheme: Bool {
+        get { UserDefaults.standard.object(forKey: linkKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: linkKey) }
+    }
+
+    static var iconTheme: Theme {
+        iconFollowsTheme ? current : named(UserDefaults.standard.string(forKey: iconKey))
+    }
+
+    static func setIconTheme(_ theme: Theme) {
+        UserDefaults.standard.set(theme.id, forKey: iconKey)
+        iconFollowsTheme = false
+    }
+
+    /// A small sample of how this theme paints the strip, for the settings window.
+    func swatch(size: NSSize) -> NSImage {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width),
+                                   pixelsHigh: Int(size.height), bitsPerSample: 8, samplesPerPixel: 4,
+                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                   bytesPerRow: 0, bitsPerPixel: 0)!
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        let bounds = CGRect(origin: .zero, size: size)
+        fill(NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6), stripeWidth: 14)
+        // A tab card, so the swatch shows what text will actually sit on.
+        chip.withAlphaComponent(0.55).setFill()
+        NSBezierPath(roundedRect: CGRect(x: 8, y: size.height / 2 - 8, width: 44, height: 16),
+                     xRadius: 5, yRadius: 5).fill()
+        NSGraphicsContext.restoreGraphicsState()
+        let image = NSImage(size: size)
+        image.addRepresentation(rep)
+        return image
     }
 }
