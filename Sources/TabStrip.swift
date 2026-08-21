@@ -173,9 +173,8 @@ final class TabStripController: NSObject, NSWindowDelegate {
             buttons.append(button)
         }
 
-        let add = NSButton(title: "", target: self, action: #selector(addClicked))
-        style(add, title: "+")
-        add.toolTip = "Add an application"
+        let add = symbolButton("plus", tooltip: "Add an application",
+                               action: #selector(addClicked))
         stack.addArrangedSubview(add)
 
         highlight(activeIndex)
@@ -194,6 +193,29 @@ final class TabStripController: NSObject, NSWindowDelegate {
     /// touches the background, so legibility stops depending on which band happens
     /// to pass behind a given tab. The stock recessed bezel is no use here -- it
     /// assumes a neutral background and turns muddy over anything coloured.
+    /// A square card carrying a single symbol, for the controls that are not tabs.
+    ///
+    /// Drawn as an image rather than as a text title: a "+" set as text sits on its
+    /// own glyph bearings, which are not symmetric, so it lands visibly off centre
+    /// however the padding is tuned. An imageOnly button centres the symbol itself.
+    private func symbolButton(_ symbol: String, tooltip: String, action: Selector) -> NSButton {
+        let button = NSButton(title: "", target: self, action: action)
+        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)
+        button.imagePosition = .imageOnly
+        button.isBordered = false
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 8
+        button.layer?.backgroundColor = Theme.current.chip.withAlphaComponent(0.55).cgColor
+        button.contentTintColor = Theme.current.text
+        button.toolTip = tooltip
+        button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 30),
+            button.heightAnchor.constraint(equalToConstant: 26),
+        ])
+        return button
+    }
+
     private func style(_ button: NSButton, title: String) {
         button.isBordered = false
         button.setButtonType(.momentaryChange)
