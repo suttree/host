@@ -222,10 +222,32 @@ final class TabStripController: NSObject, NSWindowDelegate {
         button.wantsLayer = true
         button.layer?.cornerRadius = 8
         button.layer?.backgroundColor = Theme.current.chip.withAlphaComponent(0.55).cgColor
-        button.heightAnchor.constraint(equalToConstant: 26).isActive = true
-        button.attributedTitle = NSAttributedString(string: "  \(title)  ", attributes: [
+        button.attributedTitle = Self.tabTitle(title, active: false)
+        button.sizeToFit()
+
+        // Padding comes from an explicit width, not from spaces in the title: the
+        // icon is drawn leading, so no amount of leading whitespace puts a gap
+        // before it, and trailing whitespace gets trimmed during layout. Giving the
+        // button a width and letting AppKit centre the icon and text inside it pads
+        // both sides evenly.
+        //
+        // Measured against the bold face, which is the wider of the two the active
+        // state uses. The card therefore neither clips when a tab becomes active nor
+        // changes width and reflows the whole strip as you switch tabs.
+        let extra = Self.tabTitle(title, active: true).size().width
+                  - Self.tabTitle(title, active: false).size().width
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: ceil(button.intrinsicContentSize.width + extra + 24)),
+            button.heightAnchor.constraint(equalToConstant: 26),
+        ])
+    }
+
+    private static func tabTitle(_ name: String, active: Bool) -> NSAttributedString {
+        // No leading space: AppKit already leaves a gap between the image and the
+        // title, and a space on top of it reads as a hole.
+        NSAttributedString(string: name, attributes: [
             .foregroundColor: Theme.current.text,
-            .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+            .font: NSFont.systemFont(ofSize: 12, weight: active ? .bold : .regular),
         ])
     }
 
@@ -240,10 +262,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         button.layer?.backgroundColor = active
             ? Theme.current.chip.cgColor
             : Theme.current.chip.withAlphaComponent(0.55).cgColor
-        button.attributedTitle = NSAttributedString(string: "  \(button.tabName)  ", attributes: [
-            .foregroundColor: Theme.current.text,
-            .font: NSFont.systemFont(ofSize: 12, weight: active ? .bold : .regular),
-        ])
+        button.attributedTitle = Self.tabTitle(button.tabName, active: active)
     }
 
     private func highlight(_ index: Int?) {
