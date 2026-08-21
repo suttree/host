@@ -271,17 +271,11 @@ final class TabStripController: NSObject, NSWindowDelegate {
         return result
     }
 
-    /// The active tab gets a solid card; the rest are translucent, so the stripe
-    /// shows through them and only the tab you are on reads as fully opaque.
-    ///
-    /// The translucent cards do pick up a tint from the band behind them, which on
-    /// Rainbow means a tab can sit on green or blue. That is a deliberate trade for
-    /// the lighter look -- the text stays legible either way, and weight marks the
-    /// active tab independently of the background.
+    /// The active tab is fully opaque. Inactive tabs fade as one unit so their
+    /// icons, labels, and cards all sit behind the current app visually.
     private func applyChip(_ button: TabButton, active: Bool) {
-        button.layer?.backgroundColor = active
-            ? Theme.current.chip.cgColor
-            : Theme.current.chip.withAlphaComponent(0.55).cgColor
+        button.layer?.backgroundColor = Theme.current.chip.cgColor
+        button.alphaValue = active ? 1 : 0.52
         button.attributedTitle = Self.tabTitle(button.tabName, icon: button.tabIcon, active: active)
     }
 

@@ -117,11 +117,9 @@ lets the stripes be as bold as they like: text never touches the background, so
 legibility stops depending on which band happens to pass behind a given tab.
 Rainbow is the case that proves it.
 
-The active tab gets a solid card and bold type; the rest are translucent, so only
-the tab you are on reads as fully opaque. The translucent cards do pick up a tint
-from the band behind them -- on Rainbow a tab can end up sitting on green or blue
--- which is a deliberate trade for the lighter look. Text stays legible either
-way, and the weight marks the active tab independently of the background.
+The active tab gets bold type and stays fully opaque. Inactive tabs fade to 52%
+as a complete unit, including the icon, label and card, so the current app is
+obvious without changing the tab layout.
 
 Two details that matter to how it looks:
 
