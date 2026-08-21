@@ -177,6 +177,14 @@ indefinitely, and the tab never appears. If a running app still has no window it
 gets one reopen nudge, which is what makes a document app produce an untitled
 document or its open panel.
 
+**Raising is verified, not assumed.** Neither activation route is reliable on its
+own: `NSRunningApplication.activate` is refused when Host lacks activation rights,
+and `AXFrontmost` can return success while the app still does not come forward.
+Both are tried, and 0.3s later the frontmost app is checked and the raise retried
+if it missed. Without that a tab occasionally placed its window correctly and left
+it sitting behind the app you were already on, which looks like the tab doing
+nothing.
+
 **Raising uses AXFrontmost, not just NSRunningApplication.activate.** Since macOS
 14 an app may only activate another app while it holds activation rights, and the
 tab strip is a non-activating panel, so Host is almost never frontmost and the

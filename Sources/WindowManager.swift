@@ -57,6 +57,9 @@ final class WindowManager {
             // Check back once. Some apps -- Electron ones in particular -- restore
             // their own remembered bounds a moment after being shown or activated,
             // quietly undoing a placement that reported success at the time.
+            self.queue.asyncAfter(deadline: .now() + 0.3) {
+                self.ensureFrontmost(bundleID: bundleID)
+            }
             self.queue.asyncAfter(deadline: .now() + 0.45) {
                 self.reassert(bundleID: bundleID, axRect: axRect, reason: "after placement")
             }
@@ -228,10 +231,37 @@ final class WindowManager {
     }
 
     private func activate(_ app: NSRunningApplication, appElement: AXUIElement) {
-        axSetBool(appElement, kAXFrontmostAttribute as String, true)
-        if !app.activate(options: [.activateAllWindows]) {
-            Log.line("  NSRunningApplication.activate refused; AXFrontmost carried it")
+        let bundleID = app.bundleIdentifier ?? "?"
+        // Report what actually happened. Setting AXFrontmost can fail too, and
+        // assuming it succeeded whenever activate() was refused meant the log
+        // claimed the switch had worked at the exact moments it had not.
+        let axError = AXUIElementSetAttributeValue(appElement, kAXFrontmostAttribute as CFString,
+                                                   kCFBooleanTrue as CFTypeRef)
+        let activated = app.activate(options: [.activateAllWindows])
+        if !activated || axError != .success {
+            Log.line("  \(bundleID): activate=\(activated) AXFrontmost=\(axError == .success ? "ok" : "failed")")
         }
+    }
+
+    /// Check the app really did come forward, and have one more go if it did not.
+    ///
+    /// Since macOS 14 an app may only activate another while it holds activation
+    /// rights, and Host's strip is a non-activating panel, so activate() is
+    /// sometimes refused. AXFrontmost usually covers that but not always, and when
+    /// both miss, the window is placed correctly and simply stays behind the app
+    /// you were on -- the tab looks like it did nothing.
+    private func ensureFrontmost(bundleID: String) {
+        guard let app = Self.runningApp(bundleID), !app.isHidden else { return }
+        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        guard front != bundleID else { return }
+
+        Log.line("  \(bundleID) did not come forward (\(front ?? "nothing") is in front); trying again")
+        let element = self.appElement(for: app.processIdentifier)
+        if let window = boundWindows[bundleID] {
+            axSetBool(window, kAXMainAttribute as String, true)
+            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        }
+        activate(app, appElement: element)
     }
 
     /// Poll for a usable window. Polling rather than waiting on an AX notification

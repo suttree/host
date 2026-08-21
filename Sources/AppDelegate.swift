@@ -32,6 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // actually ended up frontmost, so a switch can be verified without a
             // human clicking.
             if CommandLine.arguments.contains("--cycle") { cycleAllTabs() }
+            // Switching at roughly the speed of a person clicking, which is what
+            // shook out the activation failures in the first place.
+            if let i = CommandLine.arguments.firstIndex(of: "--stress"),
+               i + 1 < CommandLine.arguments.count, let gap = Double(CommandLine.arguments[i + 1]) {
+                cycleAllTabs(gap: gap)
+            }
             if CommandLine.arguments.contains("--resize-test") { resizeTest() }
             if CommandLine.arguments.contains("--hide-test") { hideTest() }
             if let i = CommandLine.arguments.firstIndex(of: "--nudge"),
@@ -287,10 +293,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func cycleAllTabs() {
-        Log.line("--- cycling all tabs ---")
+    private func cycleAllTabs(gap: Double = 2.0) {
+        Log.line("--- cycling all tabs (gap \(gap)s) ---")
         for (index, tab) in strip.workspace.tabs.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5 + Double(index) * 2.0) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5 + Double(index) * gap) {
                 Log.line("cycle -> \(tab.name)")
                 self.strip.select(index: index)
             }
