@@ -13,6 +13,10 @@ struct Theme {
     let id: String
     let name: String
     let style: ThemeStyle
+    /// Optional lighter palette for the tab strip. The icon can be as bold as it
+    /// likes because nothing sits on top of it; the strip carries tab names, so a
+    /// saturated band under black text is simply hard to read.
+    let barStyle: ThemeStyle?
     /// The line art's colour. Pure black is rarely right: warm palettes want a
     /// brown, dark palettes need something light or the drawing disappears.
     let ink: NSColor
@@ -23,10 +27,11 @@ struct Theme {
     let stars: Bool
 
     init(id: String, name: String, style: ThemeStyle, ink: NSColor,
-         text: NSColor, pill: NSColor, stars: Bool = false) {
+         text: NSColor, pill: NSColor, stars: Bool = false, barStyle: ThemeStyle? = nil) {
         self.id = id
         self.name = name
         self.style = style
+        self.barStyle = barStyle
         self.ink = ink
         self.text = text
         self.pill = pill
@@ -35,11 +40,20 @@ struct Theme {
 
     // MARK: - Drawing
 
-    /// `stripeWidth` nil fits the whole palette across the shape exactly once,
-    /// which is what an icon wants -- tiling makes the pale first band reappear in
-    /// the bottom-right corner and the sunset stops reading as a sunset. A width
-    /// tiles the palette, which is what a long strip wants.
-    func fill(_ path: NSBezierPath, stripeWidth: CGFloat?) {
+    /// The icon: the full-strength palette, fitted across the shape exactly once.
+    /// Tiling makes the pale first band reappear in the bottom-right corner and the
+    /// sunset stops reading as a sunset.
+    func fillIcon(_ path: NSBezierPath) {
+        fill(path, stripeWidth: nil, using: style)
+    }
+
+    /// The tab strip: the lighter palette where one is defined, tiled, because one
+    /// pass over something that long stretches each band into a smear.
+    func fillStrip(_ path: NSBezierPath, stripeWidth: CGFloat) {
+        fill(path, stripeWidth: stripeWidth, using: barStyle ?? style)
+    }
+
+    private func fill(_ path: NSBezierPath, stripeWidth: CGFloat?, using style: ThemeStyle) {
         switch style {
         case .gradient(let colours):
             let locations = (0..<colours.count).map { CGFloat($0) / CGFloat(max(1, colours.count - 1)) }
@@ -162,7 +176,10 @@ extension Theme {
               style: .stripes([rgb(1.00, 0.98, 0.78), rgb(1.00, 0.88, 0.40), rgb(1.00, 0.76, 0.03),
                                rgb(1.00, 0.60, 0.00), rgb(1.00, 0.44, 0.00), rgb(0.90, 0.29, 0.10),
                                rgb(0.75, 0.21, 0.05)]),
-              ink: rgb(0.16, 0.09, 0.05), text: .black, pill: NSColor(white: 1, alpha: 0.55)),
+              ink: rgb(0.16, 0.09, 0.05), text: .black, pill: NSColor(white: 0, alpha: 0.13),
+              barStyle: .stripes([rgb(1.00, 0.99, 0.91), rgb(1.00, 0.95, 0.77), rgb(1.00, 0.89, 0.61),
+                                  rgb(1.00, 0.82, 0.54), rgb(1.00, 0.75, 0.53), rgb(0.98, 0.68, 0.55),
+                                  rgb(0.94, 0.63, 0.54)])),
 
         Theme(id: "sunset", name: "Sunset",
               style: .gradient([rgb(0.98, 0.88, 0.48), rgb(0.95, 0.61, 0.22), rgb(0.84, 0.34, 0.18)]),

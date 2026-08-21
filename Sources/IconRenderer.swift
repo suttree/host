@@ -98,7 +98,7 @@ enum IconRenderer {
 
         let pad = size * 0.085
         let body = CGRect(x: pad, y: pad, width: size - pad * 2, height: size - pad * 2)
-        theme.fill(Theme.squircle(in: body), stripeWidth: nil)
+        theme.fillIcon(Theme.squircle(in: body))
 
         if let artwork {
             // Less padding at small sizes: the strokes scale with the drawing, so a
