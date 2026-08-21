@@ -29,11 +29,12 @@ final class TabStripPanel: NSPanel {
 
 /// The tab strip's background, in whatever theme is current.
 ///
-/// Uses the theme's strip palette, which is lighter than its icon palette where
-/// the two differ, because tab names have to be legible on it.
+/// The palette tiles here rather than being fitted to the shape once, as it is on
+/// the icon: the strip is long and short, so one pass would stretch each band into
+/// an unreadable smear.
 final class ThemeBarView: NSView {
     override func draw(_ dirtyRect: NSRect) {
-        Theme.current.fillStrip(Theme.topRoundedPath(bounds, radius: 9), stripeWidth: 34)
+        Theme.current.fill(Theme.topRoundedPath(bounds, radius: 9), stripeWidth: 34)
     }
 }
 

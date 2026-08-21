@@ -98,10 +98,6 @@ macOS forgets on relaunch, so the stored theme is re-applied at every launch.
 
 Two details that matter to how it looks:
 
-- A theme may carry a second, lighter palette for the strip. The icon can be as
-  saturated as it likes because nothing sits on top of it, but the strip carries
-  tab names and black text on a deep orange band is hard to read. Sunset Stripes
-  uses a pastel version on the strip and the full-strength one on the icon.
 - On the icon the palette is fitted across the shape exactly **once**. Tiling it
   makes the pale first band reappear in the bottom-right corner and the sunset
   stops reading as a sunset. On the strip it tiles, because one pass across
