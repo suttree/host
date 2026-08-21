@@ -308,6 +308,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         rememberActiveTab(index: index)
         highlight(index)
         isWorkspaceFront = true
+        panel.level = .floating
         panel.orderFrontRegardless()   // may have been hidden with the workspace
 
         // Hand over activation rights before asking. Cheap, main-thread, and works
@@ -478,6 +479,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
 
     func raiseStrip() {
         isWorkspaceFront = true
+        panel.level = .floating
         panel.orderFrontRegardless()
     }
 
@@ -603,13 +605,20 @@ final class TabStripController: NSObject, NSWindowDelegate {
 
         guard ours != isWorkspaceFront else { return }
         isWorkspaceFront = ours
+
+        // The strip stays on screen either way; what changes is whether it floats.
+        //
+        // Ordering it out was the first answer to "stop sitting on top of Firefox"
+        // and it overshot: the strip vanished the moment a hosted app lost focus,
+        // so the workspace looked like it had gone away. Dropping to the normal
+        // window level keeps it present while letting any other window cover it,
+        // which is what being unobtrusive should have meant.
+        panel.level = ours ? .floating : .normal
         if ours {
             panel.orderFrontRegardless()
-            Log.line("workspace is front (\(id ?? "?")); strip visible=\(panel.isVisible)")
-        } else {
-            panel.orderOut(nil)
-            Log.line("\(id ?? "another app") is front; strip visible=\(panel.isVisible)")
         }
+        Log.line("\(id ?? "another app") is front; strip level=\(ours ? "floating" : "normal") " +
+                 "visible=\(panel.isVisible)")
     }
 
     /// Order the strip front only if the workspace is what is in front.

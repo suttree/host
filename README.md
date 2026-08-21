@@ -103,6 +103,19 @@ the only way in.
 The settings window is deliberately not modal: you want the strip restyling
 itself behind it as you click through the themes.
 
+## Why the strip changes level rather than hiding
+
+It floats above normal windows so it can sit on top of the app it is hosting.
+Left at that level it would also sit on top of every unrelated window on screen.
+Lowering the level permanently is no good either -- it would be buried under the
+very window it belongs to.
+
+So the level follows the frontmost app: floating while a hosted app is in front,
+normal otherwise. It stays on screen throughout, and any other window is free to
+cover it. Ordering it out was the first attempt at this and overshot: the strip
+vanished the moment a hosted app lost focus, which made the workspace look like
+it had gone away.
+
 ## Themes
 
 `Sources/Theme.swift` holds the palettes and pattern renderers;
