@@ -8,14 +8,8 @@ import Carbon.HIToolbox
 /// also receive the keystroke. RegisterEventHotKey swallows the event, and it
 /// works from an accessory app that never becomes active.
 ///
-/// The modifier is Option. Command-digit is already spoken for in most apps -- in
-/// a browser it switches tabs, in an editor it toggles panes -- and a switcher
-/// that fights the app it just brought forward is worse than no switcher at all.
-///
-/// Control-digit was the first choice and does not work: macOS reserves it for
-/// Mission Control's "Switch to Desktop N" and consumes the event before any
-/// Carbon hotkey sees it. Registration still succeeds, which is what makes it
-/// such a quiet failure -- the keys simply never fire.
+/// Host only claims Option-Shift-[ and Option-Shift-]. Option-digit combinations
+/// are text input on several keyboard layouts, including Option-3 for `#`.
 final class HotKeyCenter {
     static let shared = HotKeyCenter()
 
@@ -24,22 +18,6 @@ final class HotKeyCenter {
     private var handlerInstalled = false
 
     private init() {}
-
-    /// Key codes for the digit row. Note that these are physical key codes and
-    /// are not in numeric order -- 5 and 6 are transposed relative to intuition.
-    static let digitKeyCodes: [UInt32] = [
-        UInt32(kVK_ANSI_1), UInt32(kVK_ANSI_2), UInt32(kVK_ANSI_3),
-        UInt32(kVK_ANSI_4), UInt32(kVK_ANSI_5), UInt32(kVK_ANSI_6),
-        UInt32(kVK_ANSI_7), UInt32(kVK_ANSI_8), UInt32(kVK_ANSI_9),
-    ]
-
-    func registerOptionDigit(index: Int, handler: @escaping () -> Void) {
-        guard index < Self.digitKeyCodes.count else { return }
-        register(keyCode: Self.digitKeyCodes[index],
-                 modifiers: UInt32(optionKey),
-                 id: UInt32(index + 1),
-                 handler: handler)
-    }
 
     func registerOptionShiftBrackets(previous: @escaping () -> Void,
                                      next: @escaping () -> Void) {

@@ -34,7 +34,7 @@ final class TabStripPanel: NSPanel {
 /// an unreadable smear.
 final class ThemeBarView: NSView {
     override func draw(_ dirtyRect: NSRect) {
-        Theme.current.fill(Theme.topRoundedPath(bounds, radius: 10), stripeWidth: 34)
+        Theme.current.fill(Theme.roundedBarPath(bounds, radius: 10), stripeWidth: 34)
     }
 }
 
@@ -121,7 +121,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         ])
 
         panel.delegate = self
-        isWorkspaceFront = true
+        isWorkspaceFront = false
         WindowManager.shared.onGeometryChange = { [weak self] bundleID, content in
             self?.followWindow(bundleID: bundleID, content: content)
         }
@@ -135,7 +135,6 @@ final class TabStripController: NSObject, NSWindowDelegate {
             self, selector: #selector(appDidActivate(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
         rebuild()
-        panel.orderFrontRegardless()
     }
 
     // MARK: - UI
@@ -306,6 +305,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         }
         let tab = workspace.tabs[index]
         activeIndex = index
+        rememberActiveTab(index: index)
         highlight(index)
         isWorkspaceFront = true
         panel.orderFrontRegardless()   // may have been hidden with the workspace
@@ -490,8 +490,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
     /// four onto the screen with it.
     func restoreWorkspace() {
         raiseStrip()
-        guard !workspace.tabs.isEmpty else { return }
-        let index = activeIndex ?? 0
+        guard let index = activeIndex ?? savedActiveTabIndex() else { return }
         Log.line("restoring workspace: strip + \(workspace.tabs[index].name)")
         select(index: index)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -501,6 +500,27 @@ final class TabStripController: NSObject, NSWindowDelegate {
             }
             Log.line("  after restore: \(states.joined(separator: "  "))  strip=\(self.panel.isVisible)")
         }
+    }
+
+    func restoreLastActiveTab() {
+        guard let index = savedActiveTabIndex() else {
+            Log.line("startup restore skipped: no tabs")
+            return
+        }
+        Log.line("startup restore: \(workspace.tabs[index].name)")
+        select(index: index)
+    }
+
+    private static let activeTabKey = "HostActiveTabBundleIdentifier"
+
+    private func savedActiveTabIndex() -> Int? {
+        restoredTabIndex(bundleIDs: workspace.tabs.map(\.bundleIdentifier),
+                         lastActiveBundleID: UserDefaults.standard.string(forKey: Self.activeTabKey))
+    }
+
+    private func rememberActiveTab(index: Int) {
+        guard workspace.tabs.indices.contains(index) else { return }
+        UserDefaults.standard.set(workspace.tabs[index].bundleIdentifier, forKey: Self.activeTabKey)
     }
 
     // MARK: - Reordering by dragging
@@ -573,6 +593,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         // thing besides select() allowed to move the active tab.
         if let id, let index = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) {
             activeIndex = index
+            rememberActiveTab(index: index)
             highlight(index)
             // Reached without clicking its tab, so nothing has sized it. Snapping
             // here is what stops a tab being active while its window sits at

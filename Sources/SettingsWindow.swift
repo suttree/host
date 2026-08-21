@@ -1,5 +1,9 @@
 import Cocoa
 
+private final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
+}
+
 /// Host's settings, reachable from the cog on the tab strip.
 ///
 /// This exists because the menu bar is unreachable in practice: it belongs to
@@ -71,14 +75,22 @@ final class SettingsWindowController: NSWindowController {
         }
         root.addArrangedSubview(grid(iconButtons, columns: 5))
 
-        let container = NSView()
+        let container = FlippedView()
         container.addSubview(root)
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            root.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
+            root.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             root.topAnchor.constraint(equalTo: container.topAnchor),
+            root.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
-        return container
+        container.frame = NSRect(x: 0, y: 0, width: 540, height: root.fittingSize.height)
+
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        scroll.documentView = container
+        return scroll
     }
 
     private func heading(_ text: String) -> NSTextField {

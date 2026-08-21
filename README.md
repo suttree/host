@@ -13,9 +13,9 @@ Then grant Accessibility, click a tab, and run **Tabs › Run Self-test**.
 ## What it does
 
 A floating, non-activating strip at the top of a workspace rectangle. Clicking a
-tab or pressing `⌥1` through `⌥9` launches the app if needed, finds its main
-window, moves it into the rectangle below the strip, and raises it. `⌥⇧[` and
-`⌥⇧]` move to the previous and next apps, wrapping at either end.
+tab launches the app if needed, finds its main window, moves it into the rectangle
+below the strip, and raises it. `⌥⇧[` and `⌥⇧]` move to the previous and next
+apps, wrapping at either end.
 
 - `+` adds an app from `/Applications`, persisted to
   `~/Library/Application Support/Host/workspace.json`. The new tab is selected
@@ -37,9 +37,10 @@ window, moves it into the rectangle below the strip, and raises it. `⌥⇧[` an
 - Drag a tab along the strip to reorder it; the order and the hotkey bindings
   follow
 - The **cog** at the right of the strip opens settings: pick the tab bar theme
-  and the app icon from nine themes — Sunset Stripes, Sunset, Rainbow, Meadow,
-  Brown, Galaxy, Starry Night, Hacker, Silver. The icon matches the theme by
-  default; click any icon to break the link and choose independently.
+  and the app icon from 33 themes. The set includes stripes, gradients, night
+  skies, polka dots, packed circles, sunflowers, roses, triangles, diamonds,
+  waves and bubbles. The icon matches the theme by default; click any icon to break the
+  link and choose independently.
   Also on View › Theme and Tabs › Settings (command-comma), for when Host
   happens to be frontmost
 - Dock icon and a **Tabs** menu holding Add Application, Self-test, Show Log and
@@ -104,10 +105,10 @@ itself behind it as you click through the themes.
 
 ## Themes
 
-`Sources/Theme.swift` holds the palettes; `Sources/IconRenderer.swift` composites
-the line drawing onto one. Both are compiled into the app *and* into the icon
-tool, so the .icns on disk and the icon the app draws at runtime come from the
-same code.
+`Sources/Theme.swift` holds the palettes and pattern renderers;
+`Sources/IconRenderer.swift` composites the line drawing onto one. Both are
+compiled into the app *and* into the icon tool, so the .icns on disk and the icon
+the app draws at runtime come from the same code.
 
 The Dock icon is redrawn in process rather than swapped on disk. Rewriting a
 signed bundle's .icns would break the code signature and take the Accessibility
@@ -144,11 +145,9 @@ drawn over anything we could put back there, so that window would be invisible �
 and it would sit in the z-order fighting the app it just raised. All that is
 actually needed is a rectangle and a floating strip. `Workspace` is the rectangle.
 
-**Option, not Command.** `⌘1`–`⌘9` are already spoken for in most apps. A
-switcher that fights the app it just brought forward is worse than no switcher.
-Control-digit was the first choice and silently does not work: macOS reserves it
-for Mission Control's "Switch to Desktop N" and consumes the event before any
-Carbon hotkey sees it, while registration still reports success.
+**No digit shortcuts.** Host does not claim Command, Control or Option with the
+number row. Those combinations belong to apps, Mission Control and keyboard
+layouts. Option-3 must remain available for typing `#`, for example.
 
 **Carbon `RegisterEventHotKey`, not `NSEvent.addGlobalMonitorForEvents`.** A
 global monitor can observe a keystroke but cannot consume it, so the frontmost app
@@ -259,7 +258,7 @@ Sources/
   SelfTest.swift       ten-switch drift measurement, log window
   AppDelegate.swift    wiring, status item, permission nag
 tools/make-identity.sh stable self-signed signing identity
-  Theme.swift          palettes and the striped/gradient drawing, shared by the
+  Theme.swift          palettes and pattern drawing, shared by the
                        tab strip and the app icon
   IconRenderer.swift   masks and crops the line art, composites it onto a theme
   SettingsWindow.swift the theme and app icon pickers, opened from the cog
