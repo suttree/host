@@ -26,7 +26,8 @@ moves it into the rectangle below the strip, and raises it.
   — removing a tab is forgetting about an app, not closing it
 - **Resizing or moving the hosted window drags the strip with it**: the strip
   re-derives the workspace from the window and matches its width exactly
-- Dragging the strip moves the whole workspace, app window included
+- Dragging the strip moves the whole workspace, and every tab's window follows,
+  not just the one on top
 - **Hiding any tab's app hides the whole workspace**, strip included. Unhiding one
   brings the strip back but not the other four — unhiding one tab should not drag
   everything else onto the screen with it.

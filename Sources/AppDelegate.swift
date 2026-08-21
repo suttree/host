@@ -34,6 +34,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if CommandLine.arguments.contains("--cycle") { cycleAllTabs() }
             if CommandLine.arguments.contains("--resize-test") { resizeTest() }
             if CommandLine.arguments.contains("--hide-test") { hideTest() }
+            if let i = CommandLine.arguments.firstIndex(of: "--nudge"),
+               i + 2 < CommandLine.arguments.count,
+               let dx = Double(CommandLine.arguments[i + 1]),
+               let dy = Double(CommandLine.arguments[i + 2]) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    Log.line("nudging the strip by \(dx), \(dy)")
+                    self.strip.nudge(dx: dx, dy: dy)
+                }
+            }
+            if CommandLine.arguments.contains("--sync") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.strip.syncEveryTab() }
+            }
             // `--select 8` switches to one tab, for testing a single app.
             if let i = CommandLine.arguments.firstIndex(of: "--select"),
                i + 1 < CommandLine.arguments.count,

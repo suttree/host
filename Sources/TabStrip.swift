@@ -406,12 +406,62 @@ final class TabStripController: NSObject, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) {
         guard !isSyncingStrip else { return }
         // The strip is the handle for the whole workspace: dragging it drags the
-        // app window with it.
+        // app windows with it.
         let strip = panel.frame
         workspace.frame = CGRect(x: strip.minX, y: strip.maxY - workspace.frame.height,
                                  width: workspace.frame.width, height: workspace.frame.height)
-        Store.save(workspace)
-        if let index = activeIndex { select(index: index) }
+
+        // snap rather than select: the window should follow the strip without the
+        // app being activated on every mouse-move event of the drag.
+        if let index = activeIndex {
+            WindowManager.shared.snap(bundleID: workspace.tabs[index].bundleIdentifier,
+                                      in: workspace.contentFrame, reason: "workspace moved")
+        }
+        syncEveryTabSoon()
+    }
+
+    private var syncWork: DispatchWorkItem?
+
+    /// Bring every tab's window to the workspace, not just the one you can see.
+    ///
+    /// Placing lazily -- only on switching to a tab -- is fine until the workspace
+    /// moves, at which point the other windows are left behind at the old position
+    /// and stick out from under the active one. They cannot simply be left to
+    /// correct themselves on the next switch, because they are visible now.
+    ///
+    /// Debounced, because during a drag this fires on every mouse-move event and
+    /// nine windows cannot be moved at that rate. The disk write waits for the same
+    /// reason.
+    /// Move the strip as a user drag would, firing the same delegate callback.
+    /// Lets the drag path be exercised without a hand on the trackpad.
+    func nudge(dx: CGFloat, dy: CGFloat) {
+        panel.setFrameOrigin(NSPoint(x: panel.frame.minX + dx, y: panel.frame.minY + dy))
+    }
+
+    /// Tidy every tab into the workspace now, without waiting for a drag to settle.
+    func syncEveryTab() {
+        syncWork?.cancel()
+        let content = workspace.contentFrame
+        for tab in workspace.tabs {
+            WindowManager.shared.snap(bundleID: tab.bundleIdentifier, in: content,
+                                      reason: "workspace moved")
+        }
+        Log.line("synced \(workspace.tabs.count) windows to \(NSStringFromRect(content))")
+    }
+
+    private func syncEveryTabSoon() {
+        syncWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            let content = self.workspace.contentFrame
+            for tab in self.workspace.tabs {
+                WindowManager.shared.snap(bundleID: tab.bundleIdentifier, in: content,
+                                          reason: "workspace moved")
+            }
+            Store.save(self.workspace)
+        }
+        syncWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
     }
 
     /// Render the strip exactly as drawn, for checking the look without a screen
@@ -626,6 +676,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         isSyncingStrip = true
         panel.setFrame(strip, display: true)
         DispatchQueue.main.async { self.isSyncingStrip = false }
-        Store.save(workspace)
+        // Resizing one window resizes the workspace, so the rest have to follow too.
+        syncEveryTabSoon()
     }
 }

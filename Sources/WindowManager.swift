@@ -69,15 +69,14 @@ final class WindowManager {
     /// other way -- command-tab, clicking its window, the Dock. Without it a tab
     /// can be the active tab while its window sits at whatever size the app last
     /// chose, which looks like the sizing simply not working.
-    func snap(bundleID: String, in cocoaRect: CGRect) {
+    func snap(bundleID: String, in cocoaRect: CGRect, reason: String = "reached outside Host") {
         let axRect = Coords.flip(cocoaRect)
         queue.async {
             guard let app = Self.runningApp(bundleID), !app.isHidden else { return }
             let element = self.appElement(for: app.processIdentifier)
             guard let window = self.waitForWindow(bundleID: bundleID, appElement: element, deadline: 1)
             else { return }
-            self.reassert(bundleID: bundleID, axRect: axRect, reason: "reached outside Host",
-                          window: window)
+            self.reassert(bundleID: bundleID, axRect: axRect, reason: reason, window: window)
         }
     }
 
