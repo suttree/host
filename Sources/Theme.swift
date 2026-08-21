@@ -15,6 +15,7 @@ enum ThemeStyle {
     case waves(background: NSColor, waves: [NSColor])
     case bubbles(background: NSColor, bubbles: [NSColor], seed: UInt64)
     case radial([NSColor])
+    case grain(background: NSColor, shades: [NSColor], seed: UInt64)
 }
 
 struct Theme {
@@ -132,6 +133,9 @@ struct Theme {
                                radius: hypot(bounds.width, bounds.height) * 0.62, options: [])
             }
             context.restoreGraphicsState()
+        case .grain(let background, let shades, let seed):
+            drawGrain(in: path, background: background, shades: shades,
+                      seed: seed, tiled: stripeWidth != nil)
         }
 
         if let starSeed { scatterStars(in: path, seed: starSeed) }
@@ -339,6 +343,28 @@ struct Theme {
         }
     }
 
+    private func drawGrain(in path: NSBezierPath, background: NSColor,
+                           shades: [NSColor], seed initialSeed: UInt64, tiled: Bool) {
+        clipped(path, background: background) { bounds in
+            var seed = initialSeed
+            func random() -> CGFloat {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return CGFloat((seed >> 33) % 100_000) / 100_000
+            }
+            let divisor: CGFloat = tiled ? 65 : 220
+            let count = Int(bounds.width * bounds.height / divisor)
+            let scale = max(1, min(bounds.width, bounds.height) * 0.004)
+            for speck in 0..<count {
+                let size = scale * (0.4 + random() * 1.8)
+                let colour = shades[speck % shades.count].withAlphaComponent(0.08 + random() * 0.30)
+                colour.setFill()
+                CGRect(x: bounds.minX + random() * bounds.width,
+                       y: bounds.minY + random() * bounds.height,
+                       width: size, height: size).fill()
+            }
+        }
+    }
+
     /// Deterministic, so the icon does not shimmer between redraws.
     private func scatterStars(in path: NSBezierPath, seed initialSeed: UInt64) {
         guard let context = NSGraphicsContext.current else { return }
@@ -508,6 +534,12 @@ extension Theme {
               style: .stripes([rgb(0.05, 0.05, 0.06), rgb(0.22, 0.23, 0.25), rgb(0.48, 0.50, 0.54),
                                rgb(0.82, 0.83, 0.85), rgb(0.38, 0.39, 0.42), rgb(0.10, 0.10, 0.11)]),
               ink: .white, text: .white, chip: rgb(0.10, 0.10, 0.11)),
+
+        Theme(id: "grainy-bw", name: "Grainy B&W",
+              style: .grain(background: rgb(0.05, 0.05, 0.05),
+                            shades: [rgb(1.00, 1.00, 1.00), rgb(0.68, 0.68, 0.68), rgb(0.32, 0.32, 0.32)],
+                            seed: 0xB1ACAAAD),
+              ink: .white, text: .white, chip: rgb(0.11, 0.11, 0.11)),
 
         Theme(id: "polka-dots", name: "Polka Dots",
               style: .polkaDots(background: rgb(0.98, 0.88, 0.86),
