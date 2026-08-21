@@ -23,7 +23,7 @@ struct Theme {
     /// than of whichever band happens to pass behind a given tab.
     let text: NSColor
     let chip: NSColor
-    /// Scattered points of light, for the night skies.
+    /// Scattered dots and stars, for the night skies.
     let stars: Bool
 
     init(id: String, name: String, style: ThemeStyle, ink: NSColor,
@@ -109,14 +109,34 @@ struct Theme {
             return CGFloat((seed >> 33) % 100_000) / 100_000
         }
         let count = Int((bounds.width * bounds.height) / 2600)
-        for _ in 0..<count {
+        for index in 0..<count {
             let x = bounds.minX + random() * bounds.width
             let y = bounds.minY + random() * bounds.height
-            let radius = bounds.width * (0.0016 + random() * 0.0034)
+            let scale = min(bounds.width, max(bounds.height, 300))
+            let radius = scale * (0.0012 + random() * 0.0015)
             NSColor(white: 1, alpha: 0.45 + random() * 0.55).setFill()
-            NSBezierPath(ovalIn: CGRect(x: x, y: y, width: radius * 2, height: radius * 2)).fill()
+            if index.isMultiple(of: 4) {
+                starPath(at: CGPoint(x: x, y: y), outerRadius: radius * 1.6).fill()
+            } else {
+                NSBezierPath(ovalIn: CGRect(x: x - radius, y: y - radius,
+                                           width: radius * 2, height: radius * 2)).fill()
+            }
         }
         context.restoreGraphicsState()
+    }
+
+    private func starPath(at centre: CGPoint, outerRadius: CGFloat) -> NSBezierPath {
+        let path = NSBezierPath()
+        let innerRadius = outerRadius * 0.42
+        for point in 0..<10 {
+            let radius = point.isMultiple(of: 2) ? outerRadius : innerRadius
+            let angle = -.pi / 2 + CGFloat(point) * .pi / 5
+            let position = CGPoint(x: centre.x + cos(angle) * radius,
+                                   y: centre.y + sin(angle) * radius)
+            if point == 0 { path.move(to: position) } else { path.line(to: position) }
+        }
+        path.close()
+        return path
     }
 
     // MARK: - Shapes
