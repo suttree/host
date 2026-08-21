@@ -50,6 +50,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.strip.nudge(dx: dx, dy: dy)
                 }
             }
+            if CommandLine.arguments.contains("--fullscreen-test") { fullScreenTest() }
+            // Recovery hatch: take every tab out of full screen.
+            if CommandLine.arguments.contains("--exit-fullscreen") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    for tab in self.strip.workspace.tabs {
+                        WindowManager.shared.setFullScreen(bundleID: tab.bundleIdentifier, to: false)
+                    }
+                }
+            }
             if CommandLine.arguments.contains("--sync") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.strip.syncEveryTab() }
             }
@@ -347,6 +356,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Log.line("  \(tab.name): \(state)")
             }
             Log.line("--- hide test done ---")
+        }
+    }
+
+    /// Full-screens the active tab and reports whether the strip is still being
+    /// displayed, then puts it back.
+    private func fullScreenTest() {
+        Log.line("--- full screen test ---")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.strip.select(index: 0) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            Log.line("before: strip on screen = \(self.strip.isOnScreen())")
+            self.strip.setActiveTabFullScreen(true)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 7.0) {
+            Log.line("FULL SCREEN: strip on screen = \(self.strip.isOnScreen())")
+            self.strip.setActiveTabFullScreen(false)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 11.0) {
+            Log.line("after: strip on screen = \(self.strip.isOnScreen())")
+            Log.line("--- full screen test done ---")
         }
     }
 

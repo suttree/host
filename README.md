@@ -116,6 +116,15 @@ cover it. Ordering it out was the first attempt at this and overshot: the strip
 vanished the moment a hosted app lost focus, which made the workspace look like
 it had gone away.
 
+Full screen is handled by the Space, not by the level. The panel is deliberately
+**not** `.canJoinAllSpaces`: a full-screen window gets a Space of its own, and
+that flag made the strip follow it there and sit on top of full-screen video.
+Without it the strip stays on the Space it belongs to, alongside the hosted
+windows. `open -a Host --args --fullscreen-test` checks this by full-screening
+the active tab and reporting whether the strip is genuinely being displayed --
+`isVisible` cannot answer that, since it stays true for a window on an inactive
+Space, so the check goes through `CGWindowListCopyWindowInfo`.
+
 ## Themes
 
 `Sources/Theme.swift` holds the palettes and pattern renderers;

@@ -5,8 +5,12 @@ import Cocoa
 /// Non-activating matters: clicking a tab must not make Host the frontmost
 /// application, because the whole point of the click is to make some *other*
 /// application frontmost. .floating keeps the strip above the app window we just
-/// raised. .managed lets Mission Control sweep it aside with the hosted window,
-/// while .canJoinAllSpaces keeps the workspace available on every Space.
+/// raised. .managed lets Mission Control sweep it aside with the hosted window.
+///
+/// Deliberately not .canJoinAllSpaces. A full-screen window gets a Space of its
+/// own, and that flag makes the strip follow it there -- so it sits on top of
+/// full-screen video. Without it the strip stays on the Space it belongs to,
+/// which is also where the hosted windows are.
 final class TabStripPanel: NSPanel {
     init(frame: CGRect) {
         super.init(contentRect: frame,
@@ -15,7 +19,7 @@ final class TabStripPanel: NSPanel {
                    defer: false)
         isFloatingPanel = true
         level = .floating
-        collectionBehavior = [.canJoinAllSpaces, .managed, .fullScreenNone]
+        collectionBehavior = [.managed, .fullScreenNone]
         hidesOnDeactivate = false
         isMovableByWindowBackground = true
         backgroundColor = .clear
@@ -475,6 +479,24 @@ final class TabStripController: NSObject, NSWindowDelegate {
         guard let data = rep.representation(using: .png, properties: [:]) else { return }
         try? data.write(to: URL(fileURLWithPath: path))
         Log.line("wrote bar preview to \(path)")
+    }
+
+    /// Whether the strip is genuinely being displayed, as opposed to merely
+    /// ordered in. isVisible stays true for a window sitting on an inactive Space,
+    /// so it cannot answer "is this on top of the full-screen video".
+    func isOnScreen() -> Bool {
+        let number = CGWindowID(panel.windowNumber)
+        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID)
+                as? [[String: Any]] else { return false }
+        return windows.contains { ($0[kCGWindowNumber as String] as? CGWindowID) == number }
+    }
+
+    /// Put the active tab's window in or out of full screen, to check what the
+    /// strip does around it.
+    func setActiveTabFullScreen(_ wanted: Bool) {
+        guard let index = activeIndex, index < workspace.tabs.count else { return }
+        WindowManager.shared.setFullScreen(bundleID: workspace.tabs[index].bundleIdentifier,
+                                           to: wanted)
     }
 
     func raiseStrip() {

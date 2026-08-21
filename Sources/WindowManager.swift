@@ -99,6 +99,25 @@ final class WindowManager {
         axSetFrame(window, axRect)
     }
 
+    /// AXFullScreen is how an app's own full-screen button is driven, so this puts
+    /// a window into the same state a user would.
+    func setFullScreen(bundleID: String, to wanted: Bool) {
+        queue.async {
+            // Re-find rather than trusting the binding: going full screen fires a
+            // main-window-changed event, which unbinds the window we were holding.
+            guard let app = Self.runningApp(bundleID) else { return }
+            let element = self.appElement(for: app.processIdentifier)
+            guard let window = self.waitForWindow(bundleID: bundleID, appElement: element,
+                                                  deadline: 2) else {
+                Log.line("  no window for \(bundleID); cannot toggle full screen")
+                return
+            }
+            let error = AXUIElementSetAttributeValue(window, "AXFullScreen" as CFString,
+                                                    (wanted ? kCFBooleanTrue : kCFBooleanFalse) as CFTypeRef)
+            Log.line("  full screen \(wanted) for \(bundleID): \(error == .success ? "ok" : "failed (\(error.rawValue))")")
+        }
+    }
+
     func forget(bundleID: String) {
         queue.async { self.boundWindows[bundleID] = nil }
     }
