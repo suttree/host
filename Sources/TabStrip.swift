@@ -34,7 +34,7 @@ final class TabStripPanel: NSPanel {
 /// an unreadable smear.
 final class ThemeBarView: NSView {
     override func draw(_ dirtyRect: NSRect) {
-        Theme.current.fill(Theme.topRoundedPath(bounds, radius: 10), stripeWidth: 34)
+        Theme.current.fill(Theme.roundedBarPath(bounds, radius: 10), stripeWidth: 34)
     }
 }
 

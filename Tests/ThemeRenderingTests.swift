@@ -19,5 +19,12 @@ struct ThemeRenderingTests {
             let icon = Theme.squircle(in: CGRect(x: 0, y: 0, width: 256, height: 256))
             assert(!icon.isEmpty)
         }
+
+        let bar = Theme.roundedBarPath(CGRect(x: 0, y: 0, width: 420, height: 46), radius: 10)
+        assert(bar.contains(CGPoint(x: 10, y: 10)))
+        assert(!bar.contains(CGPoint(x: 0, y: 0)))
+        assert(!bar.contains(CGPoint(x: 420, y: 0)))
+        assert(!bar.contains(CGPoint(x: 0, y: 46)))
+        assert(!bar.contains(CGPoint(x: 420, y: 46)))
     }
 }

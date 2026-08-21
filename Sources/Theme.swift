@@ -429,19 +429,9 @@ struct Theme {
         return path
     }
 
-    /// Rounded along the top edge only, so the strip sits flush on the window.
-    static func topRoundedPath(_ rect: CGRect, radius: CGFloat) -> NSBezierPath {
-        let path = NSBezierPath()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.line(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
-        path.appendArc(withCenter: CGPoint(x: rect.minX + radius, y: rect.maxY - radius),
-                       radius: radius, startAngle: 180, endAngle: 90, clockwise: true)
-        path.line(to: CGPoint(x: rect.maxX - radius, y: rect.maxY))
-        path.appendArc(withCenter: CGPoint(x: rect.maxX - radius, y: rect.maxY - radius),
-                       radius: radius, startAngle: 90, endAngle: 0, clockwise: true)
-        path.line(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.close()
-        return path
+    /// The tab strip floats above its hosted window, so every corner remains visible.
+    static func roundedBarPath(_ rect: CGRect, radius: CGFloat) -> NSBezierPath {
+        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
     }
 }
 
