@@ -153,7 +153,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
             button.onDragMoved = { [weak self] b, point in self?.dragTab(b, to: point) }
             button.onDragEnded = { [weak self] _ in self?.commitTabOrder() }
             style(button, title: tab.name)
-            button.toolTip = "\(tab.bundleIdentifier)   (control-\(index + 1))"
+            button.toolTip = "\(tab.bundleIdentifier)   (option-\(index + 1))"
 
             // Right-click to remove. Deliberately not a hotkey and not an always
             // visible close button: tabs here are a persistent workspace rather

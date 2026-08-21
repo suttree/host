@@ -34,6 +34,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if CommandLine.arguments.contains("--cycle") { cycleAllTabs() }
             if CommandLine.arguments.contains("--resize-test") { resizeTest() }
             if CommandLine.arguments.contains("--hide-test") { hideTest() }
+            // `--select 8` switches to one tab, for testing a single app.
+            if let i = CommandLine.arguments.firstIndex(of: "--select"),
+               i + 1 < CommandLine.arguments.count,
+               let index = Int(CommandLine.arguments[i + 1]) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self.strip.select(index: index)
+                }
+            }
             if let i = CommandLine.arguments.firstIndex(of: "--settings-preview"),
                i + 1 < CommandLine.arguments.count {
                 let path = CommandLine.arguments[i + 1]
@@ -91,12 +99,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func registerHotKeys() {
         HotKeyCenter.shared.unregisterAll()
         for index in strip.workspace.tabs.indices {
-            HotKeyCenter.shared.registerControlDigit(index: index) { [weak self] in
+            HotKeyCenter.shared.registerOptionDigit(index: index) { [weak self] in
                 self?.strip.select(index: index)
             }
         }
         rebuildTabsMenu()
-        Log.line("hotkeys: control-1 .. control-\(strip.workspace.tabs.count)")
+        Log.line("hotkeys: option-1 .. option-\(strip.workspace.tabs.count)")
     }
 
     /// Clicking the Dock icon brings the whole workspace back, not just the strip.
@@ -149,7 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.removeAllItems()
         for (index, tab) in strip.workspace.tabs.enumerated() where index < 9 {
             let item = NSMenuItem(title: tab.name, action: #selector(tabMenuItem(_:)), keyEquivalent: "\(index + 1)")
-            item.keyEquivalentModifierMask = [.control]
+            item.keyEquivalentModifierMask = [.option]
             item.target = self
             item.tag = index
             menu.addItem(item)

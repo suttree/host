@@ -220,7 +220,25 @@ final class WindowManager {
                 return w
             }
         }
-        return axElements(appElement, kAXWindowsAttribute as String).first(where: axIsStandardWindow)
+        let windows = axElements(appElement, kAXWindowsAttribute as String)
+        if let standard = windows.first(where: axIsStandardWindow) { return standard }
+
+        // Last resort: the biggest window, whatever it calls itself.
+        //
+        // Some apps mislabel their one and only window. Music reports its main
+        // window as AXDialog, which the subrole test rejects, and the tab then does
+        // nothing at all with no visible reason. A window that is plainly the app's
+        // main window is a better tab than no tab.
+        let fallback = windows
+            .compactMap { window -> (AXUIElement, CGFloat)? in
+                guard let frame = axFrame(window), frame.width > 200, frame.height > 200 else { return nil }
+                return (window, frame.width * frame.height)
+            }
+            .max { $0.1 < $1.1 }?.0
+        if fallback != nil {
+            Log.line("  no window with a standard subrole; falling back to the largest")
+        }
+        return fallback
     }
 
     private func appElement(for pid: pid_t) -> AXUIElement {

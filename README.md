@@ -13,7 +13,7 @@ Then grant Accessibility, click a tab, and run **Tabs › Run Self-test**.
 ## What it does
 
 A floating, non-activating strip at the top of a workspace rectangle. Clicking a
-tab (or pressing `⌃1` / `⌃2`) launches the app if needed, finds its main window,
+tab (or pressing `⌥1` / `⌥2`) launches the app if needed, finds its main window,
 moves it into the rectangle below the strip, and raises it.
 
 - `+` adds an app from `/Applications`, persisted to
@@ -142,8 +142,11 @@ drawn over anything we could put back there, so that window would be invisible �
 and it would sit in the z-order fighting the app it just raised. All that is
 actually needed is a rectangle and a floating strip. `Workspace` is the rectangle.
 
-**Control, not Command.** `⌘1`–`⌘9` are already spoken for in most apps. A
+**Option, not Command.** `⌘1`–`⌘9` are already spoken for in most apps. A
 switcher that fights the app it just brought forward is worse than no switcher.
+Control-digit was the first choice and silently does not work: macOS reserves it
+for Mission Control's "Switch to Desktop N" and consumes the event before any
+Carbon hotkey sees it, while registration still reports success.
 
 **Carbon `RegisterEventHotKey`, not `NSEvent.addGlobalMonitorForEvents`.** A
 global monitor can observe a keystroke but cannot consume it, so the frontmost app
@@ -208,10 +211,6 @@ windows end up mirrored vertically.
   it.** Photos will not go below ~615pt tall. It is placed at the workspace origin
   and simply extends past the bottom; the strip and every other tab keep the size
   you chose. The log says so explicitly when it happens.
-- **`⌃1`–`⌃3` register successfully but never fire**, because macOS reserves
-  control-digit for Mission Control's "Switch to Desktop N" and consumes them
-  before Carbon hotkeys see them. Changing `controlKey` to `optionKey` in
-  `HotKeys.swift` is the whole fix. Clicking tabs works.
 - One window per app. A second document window is not tracked; the AX observer
   notices and unbinds, and the next click rebinds to whatever is main.
 - Multi-monitor is untested.
