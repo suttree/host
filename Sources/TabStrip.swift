@@ -46,6 +46,7 @@ final class ThemeBarView: NSView {
 final class TabButton: NSButton {
     var bundleIdentifier = ""
     var tabName = ""
+    var tabIcon: NSImage?
     var onDragMoved: ((TabButton, CGPoint) -> Void)?
     var onDragEnded: ((TabButton) -> Void)?
 
@@ -148,14 +149,10 @@ final class TabStripController: NSObject, NSWindowDelegate {
             button.tag = index
             button.bundleIdentifier = tab.bundleIdentifier
             button.tabName = tab.name
-            button.imagePosition = .imageLeading
+            button.tabIcon = tab.icon
             button.onDragMoved = { [weak self] b, point in self?.dragTab(b, to: point) }
             button.onDragEnded = { [weak self] _ in self?.commitTabOrder() }
             style(button, title: tab.name)
-            if let icon = tab.icon {
-                icon.size = NSSize(width: 16, height: 16)
-                button.image = icon
-            }
             button.toolTip = "\(tab.bundleIdentifier)   (control-\(index + 1))"
 
             // Right-click to remove. Deliberately not a hotkey and not an always
@@ -222,7 +219,8 @@ final class TabStripController: NSObject, NSWindowDelegate {
         button.wantsLayer = true
         button.layer?.cornerRadius = 8
         button.layer?.backgroundColor = Theme.current.chip.withAlphaComponent(0.55).cgColor
-        button.attributedTitle = Self.tabTitle(title, active: false)
+        button.imagePosition = .noImage
+        button.attributedTitle = Self.tabTitle(title, icon: (button as? TabButton)?.tabIcon, active: false)
         button.sizeToFit()
 
         // Padding comes from an explicit width, not from spaces in the title: the
@@ -234,21 +232,43 @@ final class TabStripController: NSObject, NSWindowDelegate {
         // Measured against the bold face, which is the wider of the two the active
         // state uses. The card therefore neither clips when a tab becomes active nor
         // changes width and reflows the whole strip as you switch tabs.
-        let extra = Self.tabTitle(title, active: true).size().width
-                  - Self.tabTitle(title, active: false).size().width
+        let icon = (button as? TabButton)?.tabIcon
+        let extra = Self.tabTitle(title, icon: icon, active: true).size().width
+                  - Self.tabTitle(title, icon: icon, active: false).size().width
         NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: ceil(button.intrinsicContentSize.width + extra + 24)),
+            button.widthAnchor.constraint(equalToConstant: ceil(button.intrinsicContentSize.width + extra + 30)),
             button.heightAnchor.constraint(equalToConstant: 26),
         ])
     }
 
-    private static func tabTitle(_ name: String, active: Bool) -> NSAttributedString {
-        // No leading space: AppKit already leaves a gap between the image and the
-        // title, and a space on top of it reads as a hole.
-        NSAttributedString(string: name, attributes: [
+    /// Icon and name as one attributed string, with the icon as a text attachment.
+    ///
+    /// NSButton's own image-plus-title layout puts a gap between the two that it
+    /// does not expose, and app icons carry their own transparent margin on top of
+    /// it, so the two never looked evenly spaced. As an attachment the gap is just
+    /// kerning, and is set to exactly what it should be.
+    private static func tabTitle(_ name: String, icon: NSImage?, active: Bool) -> NSAttributedString {
+        let font = NSFont.systemFont(ofSize: 12, weight: active ? .bold : .regular)
+        let result = NSMutableAttributedString()
+
+        if let icon {
+            icon.size = NSSize(width: 16, height: 16)
+            let attachment = NSTextAttachment()
+            attachment.image = icon
+            // Centred on the font's cap height rather than sitting on the baseline.
+            attachment.bounds = CGRect(x: 0, y: (font.capHeight - 16) / 2, width: 16, height: 16)
+            result.append(NSAttributedString(attachment: attachment))
+            // An en space, which is half the point size, so 6pt at 12pt type.
+            // Kerning is not honoured across an attachment in a button title, so
+            // the gap has to be a character with a width of its own.
+            result.append(NSAttributedString(string: "\u{2002}", attributes: [.font: font]))
+        }
+
+        result.append(NSAttributedString(string: name, attributes: [
             .foregroundColor: Theme.current.text,
-            .font: NSFont.systemFont(ofSize: 12, weight: active ? .bold : .regular),
-        ])
+            .font: font,
+        ]))
+        return result
     }
 
     /// The active tab gets a solid card; the rest are translucent, so the stripe
@@ -262,7 +282,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         button.layer?.backgroundColor = active
             ? Theme.current.chip.cgColor
             : Theme.current.chip.withAlphaComponent(0.55).cgColor
-        button.attributedTitle = Self.tabTitle(button.tabName, active: active)
+        button.attributedTitle = Self.tabTitle(button.tabName, icon: button.tabIcon, active: active)
     }
 
     private func highlight(_ index: Int?) {
