@@ -236,7 +236,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
         let extra = Self.tabTitle(title, icon: icon, active: true).size().width
                   - Self.tabTitle(title, icon: icon, active: false).size().width
         NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: ceil(button.intrinsicContentSize.width + extra + 30)),
+            button.widthAnchor.constraint(equalToConstant: ceil(button.intrinsicContentSize.width + extra + 15)),
             button.heightAnchor.constraint(equalToConstant: 26),
         ])
     }
