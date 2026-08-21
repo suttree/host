@@ -11,6 +11,7 @@ enum ThemeStyle {
     case packedCircles(background: NSColor, circles: [NSColor], seed: UInt64)
     case triangles([NSColor], seed: UInt64)
     case sunflowers(background: NSColor, petals: [NSColor], centre: NSColor)
+    case roses(background: NSColor, petals: [NSColor], leaves: NSColor)
     case diamonds(background: NSColor, diamonds: [NSColor])
     case waves(background: NSColor, waves: [NSColor], spacing: CGFloat, amplitude: CGFloat)
     case bubbles(background: NSColor, bubbles: [NSColor], seed: UInt64)
@@ -111,6 +112,9 @@ struct Theme {
         case .sunflowers(let background, let petals, let centre):
             drawSunflowers(in: path, background: background, petals: petals,
                            centre: centre, tiled: stripeWidth != nil)
+        case .roses(let background, let petals, let leaves):
+            drawRoses(in: path, background: background, petals: petals,
+                      leaves: leaves, tiled: stripeWidth != nil)
         case .diamonds(let background, let diamonds):
             drawDiamonds(in: path, background: background, colours: diamonds,
                          tiled: stripeWidth != nil)
@@ -262,6 +266,54 @@ struct Theme {
                     NSBezierPath(ovalIn: CGRect(x: flowerCentre.x - spacing * 0.10,
                                                y: flowerCentre.y - spacing * 0.10,
                                                width: spacing * 0.20, height: spacing * 0.20)).fill()
+                    column += 1
+                    x += spacing
+                }
+                row += 1
+                y += spacing
+            }
+        }
+    }
+
+    private func drawRoses(in path: NSBezierPath, background: NSColor,
+                           petals: [NSColor], leaves: NSColor, tiled: Bool) {
+        clipped(path, background: background) { bounds in
+            let spacing = tiled ? CGFloat(30) : bounds.width / 6
+            var row = 0
+            var y = bounds.minY - spacing / 2
+            while y < bounds.maxY + spacing {
+                var column = 0
+                var x = bounds.minX + (row.isMultiple(of: 2) ? 0 : spacing / 2)
+                while x < bounds.maxX + spacing {
+                    leaves.setFill()
+                    for direction: CGFloat in [-1, 1] {
+                        let leaf = NSBezierPath(ovalIn: CGRect(
+                            x: x + direction * spacing * 0.13 - spacing * 0.10,
+                            y: y - spacing * 0.04,
+                            width: spacing * 0.20,
+                            height: spacing * 0.10
+                        ))
+                        leaf.fill()
+                    }
+
+                    for ring in stride(from: 3, through: 1, by: -1) {
+                        let radius = spacing * CGFloat(ring) * 0.055
+                        for petal in 0..<5 {
+                            let angle = CGFloat(petal) * 2 * .pi / 5 + CGFloat(ring) * 0.35
+                            let centre = CGPoint(x: x + cos(angle) * radius,
+                                                 y: y + sin(angle) * radius)
+                            petals[(row + column + ring + petal) % petals.count].setFill()
+                            NSBezierPath(ovalIn: CGRect(x: centre.x - radius * 0.85,
+                                                       y: centre.y - radius * 0.65,
+                                                       width: radius * 1.7,
+                                                       height: radius * 1.3)).fill()
+                        }
+                    }
+
+                    petals.last?.setFill()
+                    let heart = spacing * 0.055
+                    NSBezierPath(ovalIn: CGRect(x: x - heart, y: y - heart,
+                                               width: heart * 2, height: heart * 2)).fill()
                     column += 1
                     x += spacing
                 }
@@ -452,6 +504,18 @@ extension Theme {
         Theme(id: "sunset", name: "Sunset",
               style: .gradient([rgb(0.98, 0.88, 0.48), rgb(0.95, 0.61, 0.22), rgb(0.84, 0.34, 0.18)]),
               ink: rgb(0.14, 0.08, 0.05), text: .black, chip: rgb(0.98, 0.97, 0.95)),
+
+        Theme(id: "hot-pink-stripes", name: "Hot Pink Stripes",
+              style: .stripes([rgb(1.00, 0.76, 0.89), rgb(1.00, 0.40, 0.73), rgb(1.00, 0.08, 0.56),
+                               rgb(0.91, 0.00, 0.48), rgb(0.72, 0.00, 0.40), rgb(1.00, 0.18, 0.66)]),
+              ink: rgb(0.22, 0.01, 0.12), text: .white, chip: rgb(0.45, 0.00, 0.25)),
+
+        Theme(id: "rose-garden", name: "Rose Garden",
+              style: .roses(background: rgb(1.00, 0.91, 0.94),
+                            petals: [rgb(0.98, 0.55, 0.68), rgb(0.91, 0.26, 0.45),
+                                      rgb(0.72, 0.10, 0.30)],
+                            leaves: rgb(0.43, 0.62, 0.42)),
+              ink: rgb(0.31, 0.08, 0.15), text: rgb(0.28, 0.07, 0.13), chip: rgb(1.00, 0.96, 0.97)),
 
         Theme(id: "rainbow", name: "Rainbow",
               style: .stripes([rgb(0.93, 0.11, 0.14), rgb(1.00, 0.50, 0.15), rgb(1.00, 0.95, 0.00),

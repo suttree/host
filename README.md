@@ -37,9 +37,9 @@ apps, wrapping at either end.
 - Drag a tab along the strip to reorder it; the order and the hotkey bindings
   follow
 - The **cog** at the right of the strip opens settings: pick the tab bar theme
-  and the app icon from 31 themes. The set includes stripes, gradients, night
-  skies, polka dots, packed circles, sunflowers, triangles, diamonds, waves and
-  bubbles. The icon matches the theme by default; click any icon to break the
+  and the app icon from 33 themes. The set includes stripes, gradients, night
+  skies, polka dots, packed circles, sunflowers, roses, triangles, diamonds,
+  waves and bubbles. The icon matches the theme by default; click any icon to break the
   link and choose independently.
   Also on View › Theme and Tabs › Settings (command-comma), for when Host
   happens to be frontmost

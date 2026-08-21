@@ -10,9 +10,9 @@ struct ThemeRenderingTests {
                          "silver-black", "polka-dots", "circle-packing", "delaunay-triangles",
                          "harlequin", "sunrise", "lavender", "fern", "heather", "water",
                          "sparkling-water", "supernova", "grainy-bw", "lavender-kitten-grey",
-                         "gentle-water", "sea-foam"])
+                         "gentle-water", "sea-foam", "hot-pink-stripes", "rose-garden"])
         assert(added.isSubset(of: Set(ids)))
-        assert(Theme.all.count == 31)
+        assert(Theme.all.count == 33)
 
         for theme in Theme.all {
             assert(theme.swatch(size: NSSize(width: 420, height: 46)).tiffRepresentation != nil)
