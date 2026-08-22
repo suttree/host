@@ -76,7 +76,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     self.showSettings()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                        guard let view = SettingsWindowController.shared.window?.contentView,
+                        // The document view, not the content view: the scroll view
+                        // would only capture the part currently on screen.
+                        var view = SettingsWindowController.shared.window?.contentView
+                        if let scroll = view as? NSScrollView { view = scroll.documentView }
+                        guard let view,
                               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
                         view.cacheDisplay(in: view.bounds, to: rep)
                         try? rep.representation(using: .png, properties: [:])?

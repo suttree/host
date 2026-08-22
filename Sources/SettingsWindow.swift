@@ -21,9 +21,16 @@ final class SettingsWindowController: NSWindowController {
     private var followCheckbox: NSButton!
 
     private init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 520),
-                              styleMask: [.titled, .closable],
+        // Resizable, and as tall as the screen sensibly allows. With 33 themes the
+        // content is far longer than any fixed height, so a window that cannot be
+        // grown leaves whole sections reachable only by scrolling -- or not at all
+        // if the scroll view's own height is wrong.
+        let available = NSScreen.main?.visibleFrame.height ?? 800
+        let height = min(760, max(460, available - 120))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: height),
+                              styleMask: [.titled, .closable, .resizable],
                               backing: .buffered, defer: false)
+        window.minSize = NSSize(width: 560, height: 360)
         window.title = "Host Settings"
         window.isReleasedWhenClosed = false
         super.init(window: window)
@@ -39,6 +46,11 @@ final class SettingsWindowController: NSWindowController {
         NSApp.activate(ignoringOtherApps: true)
         refresh()
         window?.makeKeyAndOrderFront(nil)
+        if let scroll = window?.contentView as? NSScrollView,
+           let document = scroll.documentView {
+            Log.line("settings: content \(Int(document.frame.height))pt, " +
+                     "window shows \(Int(scroll.contentView.bounds.height))pt")
+        }
     }
 
     // MARK: - Building
@@ -56,7 +68,7 @@ final class SettingsWindowController: NSWindowController {
             swatchButton(image: theme.swatch(size: NSSize(width: 140, height: 34)),
                          title: theme.name, tag: index, action: #selector(themeChosen(_:)))
         }
-        root.addArrangedSubview(grid(themeButtons, columns: 3))
+        root.addArrangedSubview(grid(themeButtons, columns: 3, cellWidth: 150))
 
         root.addArrangedSubview(separator())
 
@@ -73,9 +85,10 @@ final class SettingsWindowController: NSWindowController {
             return swatchButton(image: image, title: theme.name, tag: index,
                                 action: #selector(iconChosen(_:)))
         }
-        root.addArrangedSubview(grid(iconButtons, columns: 5))
+        root.addArrangedSubview(grid(iconButtons, columns: 5, cellWidth: 96))
 
         let container = FlippedView()
+        container.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(root)
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: container.leadingAnchor),
@@ -83,13 +96,24 @@ final class SettingsWindowController: NSWindowController {
             root.topAnchor.constraint(equalTo: container.topAnchor),
             root.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
-        container.frame = NSRect(x: 0, y: 0, width: 540, height: root.fittingSize.height)
 
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         scroll.drawsBackground = false
         scroll.documentView = container
+
+        // Let Auto Layout size the document view: its width tracks the clip view
+        // and its height falls out of the content. Setting the frame once from
+        // fittingSize -- before anything has been laid out -- fixes the scrollable
+        // height at a guess, and when that guess is short the sections at the
+        // bottom cannot be scrolled to at all.
+        NSLayoutConstraint.activate([
+            container.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            container.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+            container.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+        ])
         return scroll
     }
 
@@ -122,7 +146,13 @@ final class SettingsWindowController: NSWindowController {
         return button
     }
 
-    private func grid(_ buttons: [NSButton], columns: Int) -> NSView {
+    /// Every cell is the same fixed width, so the columns line up.
+    ///
+    /// Letting each cell size to its own contents means the label decides the
+    /// width, and one long name -- "Lavender & Kitten Grey" -- shoves its whole
+    /// column sideways and the grid stops being a grid. The names wrap to two
+    /// lines and truncate rather than widening the cell.
+    private func grid(_ buttons: [NSButton], columns: Int, cellWidth: CGFloat) -> NSView {
         let rows = NSStackView()
         rows.orientation = .vertical
         rows.alignment = .leading
@@ -139,12 +169,29 @@ final class SettingsWindowController: NSWindowController {
                 cell.orientation = .vertical
                 cell.alignment = .centerX
                 cell.spacing = 3
+                cell.translatesAutoresizingMaskIntoConstraints = false
+
                 let label = NSTextField(labelWithString: button.toolTip ?? "")
                 label.font = .systemFont(ofSize: 10)
                 label.textColor = .secondaryLabelColor
+                label.alignment = .center
+                label.lineBreakMode = .byTruncatingTail
+                label.maximumNumberOfLines = 2
+                label.cell?.wraps = true
+                label.preferredMaxLayoutWidth = cellWidth
+                label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
                 cell.addArrangedSubview(button)
                 cell.addArrangedSubview(label)
+                cell.widthAnchor.constraint(equalToConstant: cellWidth).isActive = true
                 row.addArrangedSubview(cell)
+            }
+            // Short final rows must not stretch to fill the width.
+            if chunk.count < columns {
+                let filler = NSView()
+                filler.translatesAutoresizingMaskIntoConstraints = false
+                row.addArrangedSubview(filler)
             }
             rows.addArrangedSubview(row)
         }

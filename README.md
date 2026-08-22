@@ -101,7 +101,8 @@ still exist and work when Host does happen to be frontmost; they just cannot be
 the only way in.
 
 The settings window is deliberately not modal: you want the strip restyling
-itself behind it as you click through the themes.
+itself behind it as you click through the themes. There is no Save button —
+picking a theme or an icon applies it immediately.
 
 ## Why the strip changes level rather than hiding
 
