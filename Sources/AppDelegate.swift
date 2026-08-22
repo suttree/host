@@ -181,6 +181,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The add-application open panel keeps Host active for as long as it is up.
     func holdWorkspaceForOpenPanel() { holdWorkspace(for: 120) }
 
+    /// Hiding the workspace leaves Host itself frontmost, since every app that was
+    /// in front has just gone away. That activation must not be read as you asking
+    /// for the workspace back -- you asked for the opposite.
+    func holdWorkspaceForHide() { holdWorkspace(for: 2) }
+
     private func holdWorkspace(for seconds: TimeInterval) {
         holdWorkspaceUntil = Date().addingTimeInterval(seconds)
     }

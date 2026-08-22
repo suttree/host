@@ -663,6 +663,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
               workspace.tabs.contains(where: { $0.bundleIdentifier == id }) else { return }
 
         isBulkHiding = true
+        AppDelegate.shared?.holdWorkspaceForHide()
         Log.line("\(id) hidden; hiding the rest of the workspace")
         for tab in workspace.tabs where tab.bundleIdentifier != id {
             WindowManager.runningApp(tab.bundleIdentifier)?.hide()
