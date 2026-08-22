@@ -20,6 +20,14 @@ struct ThemeRenderingTests {
             assert(!icon.isEmpty)
         }
 
+        // The pickers index Theme.sorted, so it must hold every theme exactly once
+        // and actually be in order.
+        assert(Theme.sorted.count == Theme.all.count)
+        assert(Set(Theme.sorted.map(\.id)) == Set(ids))
+        let names = Theme.sorted.map(\.name)
+        assert(names == names.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
+        assert(Theme.fallback.id == "sunset-stripes")
+
         let bar = Theme.roundedBarPath(CGRect(x: 0, y: 0, width: 420, height: 46), radius: 10)
         assert(bar.contains(CGPoint(x: 10, y: 10)))
         assert(!bar.contains(CGPoint(x: 0, y: 0)))

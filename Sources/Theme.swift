@@ -717,6 +717,13 @@ extension Theme {
               ink: rgb(0.10, 0.11, 0.13), text: .black, chip: rgb(0.98, 0.97, 0.95)),
     ]
 
+    /// Alphabetical, for anything the user reads. `all` keeps its authored order
+    /// because `fallback` is its first element -- sorting that would silently
+    /// change which theme a fresh install starts on.
+    static let sorted: [Theme] = all.sorted {
+        $0.name.localizedStandardCompare($1.name) == .orderedAscending
+    }
+
     static let fallback = all[0]
 
     static func named(_ id: String?) -> Theme {

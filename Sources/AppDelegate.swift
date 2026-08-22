@@ -234,7 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let header = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
-        for (index, theme) in Theme.all.enumerated() {
+        for (index, theme) in Theme.sorted.enumerated() {
             let item = NSMenuItem(title: theme.name, action: #selector(themeSelected(_:)), keyEquivalent: "")
             item.target = self
             item.tag = index
@@ -245,8 +245,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func themeSelected(_ sender: NSMenuItem) {
-        guard Theme.all.indices.contains(sender.tag) else { return }
-        apply(theme: Theme.all[sender.tag])
+        guard Theme.sorted.indices.contains(sender.tag) else { return }
+        apply(theme: Theme.sorted[sender.tag])
     }
 
     @objc private func previousTab() { strip.selectRelative(offset: -1) }

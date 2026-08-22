@@ -88,7 +88,7 @@ final class SettingsWindowController: NSWindowController {
         root.translatesAutoresizingMaskIntoConstraints = false
 
         root.addArrangedSubview(heading("Tab bar theme"))
-        themeButtons = Theme.all.enumerated().map { index, theme in
+        themeButtons = Theme.sorted.enumerated().map { index, theme in
             swatchButton(image: theme.swatch(size: Self.swatchSize),
                          title: theme.name, tag: index, action: #selector(themeChosen(_:)))
         }
@@ -102,7 +102,7 @@ final class SettingsWindowController: NSWindowController {
         root.addArrangedSubview(followCheckbox)
 
         let artwork = IconRenderer.fromBundle()
-        iconButtons = Theme.all.enumerated().map { index, theme in
+        iconButtons = Theme.sorted.enumerated().map { index, theme in
             let rep = IconRenderer.render(theme: theme, size: 128, artwork: artwork)
             let image = NSImage(size: NSSize(width: 64, height: 64))
             image.addRepresentation(rep)
@@ -229,11 +229,11 @@ final class SettingsWindowController: NSWindowController {
         let theme = Theme.current
         let icon = Theme.iconTheme
         for (index, button) in themeButtons.enumerated() {
-            button.layer?.borderColor = Theme.all[index].id == theme.id
+            button.layer?.borderColor = Theme.sorted[index].id == theme.id
                 ? NSColor.controlAccentColor.cgColor : NSColor.clear.cgColor
         }
         for (index, button) in iconButtons.enumerated() {
-            button.layer?.borderColor = Theme.all[index].id == icon.id
+            button.layer?.borderColor = Theme.sorted[index].id == icon.id
                 ? NSColor.controlAccentColor.cgColor : NSColor.clear.cgColor
             // Deliberately never disabled. Dimming them out while "match" is
             // ticked means you have to untick first to do the obvious thing;
@@ -244,13 +244,13 @@ final class SettingsWindowController: NSWindowController {
     }
 
     @objc private func themeChosen(_ sender: NSButton) {
-        guard Theme.all.indices.contains(sender.tag) else { return }
-        AppDelegate.shared?.apply(theme: Theme.all[sender.tag])
+        guard Theme.sorted.indices.contains(sender.tag) else { return }
+        AppDelegate.shared?.apply(theme: Theme.sorted[sender.tag])
     }
 
     @objc private func iconChosen(_ sender: NSButton) {
-        guard Theme.all.indices.contains(sender.tag) else { return }
-        AppDelegate.shared?.apply(iconTheme: Theme.all[sender.tag])
+        guard Theme.sorted.indices.contains(sender.tag) else { return }
+        AppDelegate.shared?.apply(iconTheme: Theme.sorted[sender.tag])
     }
 
     @objc private func followToggled(_ sender: NSButton) {
