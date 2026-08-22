@@ -37,18 +37,38 @@ final class SettingsWindowController: NSWindowController {
                               styleMask: [.titled, .closable, .resizable],
                               backing: .buffered, defer: false)
         window.minSize = NSSize(width: 560, height: 360)
-        // Above the tab strip. The strip floats so it can sit on top of the app it
-        // hosts, which means a normal-level settings window opens underneath it.
-        window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
+        window.level = Self.level(hostIsFront: true)
         window.title = "Host Settings"
         window.isReleasedWhenClosed = false
         super.init(window: window)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(appDidActivate(_:)),
+            name: NSWorkspace.didActivateApplicationNotification, object: nil)
         window.contentView = buildContent()
         window.center()
         clampToScreen()
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// Above the strip while Host is frontmost, ordinary otherwise.
+    ///
+    /// It has to outrank the strip, because the strip floats so it can cover the
+    /// app it hosts and would otherwise cover this window too. But a window that
+    /// outranks the strip permanently also sits on top of every other app on the
+    /// screen, which is no better than the problem it solves.
+    private static func level(hostIsFront: Bool) -> NSWindow.Level {
+        hostIsFront ? NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1) : .normal
+    }
+
+    @objc private func appDidActivate(_ note: Notification) {
+        guard let window, window.isVisible else { return }
+        let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+        let hostIsFront = app?.bundleIdentifier == Bundle.main.bundleIdentifier
+        window.level = Self.level(hostIsFront: hostIsFront)
+        Log.line("settings window level=\(hostIsFront ? "above the strip" : "normal") " +
+                 "(\(app?.bundleIdentifier ?? "?") is front)")
+    }
 
     /// Keep the whole window on screen. center() places a tall window high enough
     /// that its title bar can end up above the visible frame, out of reach.
@@ -69,6 +89,7 @@ final class SettingsWindowController: NSWindowController {
         NSApp.activate(ignoringOtherApps: true)
         refresh()
         clampToScreen()
+        window?.level = Self.level(hostIsFront: true)
         window?.makeKeyAndOrderFront(nil)
         if let scroll = window?.contentView as? NSScrollView,
            let document = scroll.documentView {
