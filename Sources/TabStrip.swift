@@ -354,6 +354,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
     @objc private func addClicked() { addApplication() }
 
     func addApplication() {
+        AppDelegate.shared?.holdWorkspaceForOpenPanel()
         NSApp.activate(ignoringOtherApps: true)
         let open = NSOpenPanel()
         open.directoryURL = URL(fileURLWithPath: "/Applications")

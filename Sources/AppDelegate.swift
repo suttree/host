@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         registerHotKeys()
         apply(theme: Theme.current)
+        holdWorkspace(for: 2)
 
         Log.line("host up. tabs: \(strip.workspace.tabs.map(\.name).joined(separator: ", "))")
         Log.line("workspace rect \(NSStringFromRect(strip.workspace.frame))")
@@ -145,8 +146,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Clicking the Dock icon brings the whole workspace back, not just the strip.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        strip?.restoreWorkspace()
+        bringWorkspaceForward()
         return true
+    }
+
+    /// Reaching Host through the command-tab switcher should land you in the app
+    /// you were last using, not on a bare strip.
+    ///
+    /// Host has no window of its own beyond the strip, so activating it otherwise
+    /// leaves you looking at whatever was already on screen with a tab bar over it.
+    func applicationDidBecomeActive(_ notification: Notification) {
+        bringWorkspaceForward()
+    }
+
+    /// Suppressed while Host's own windows are being opened. Settings and the log
+    /// activate Host to show themselves, and switching to a tab's app at that
+    /// moment would snatch the focus straight back off the window you just asked
+    /// for.
+    private var holdWorkspaceUntil = Date.distantPast
+
+    private func bringWorkspaceForward() {
+        guard Date() >= holdWorkspaceUntil, let strip else { return }
+        // A visible window of our own means you came here for that window.
+        let ownWindows = NSApp.windows.filter { $0.isVisible && !($0 is TabStripPanel) }
+        guard ownWindows.isEmpty else {
+            Log.line("Host activated for its own window (\(ownWindows.map(\.title).joined(separator: ", "))); " +
+                     "leaving the workspace alone")
+            return
+        }
+        holdWorkspaceUntil = Date().addingTimeInterval(1.0)
+        strip.restoreWorkspace()
+    }
+
+    /// The add-application open panel keeps Host active for as long as it is up.
+    func holdWorkspaceForOpenPanel() { holdWorkspace(for: 120) }
+
+    private func holdWorkspace(for seconds: TimeInterval) {
+        holdWorkspaceUntil = Date().addingTimeInterval(seconds)
     }
 
     // MARK: - Menu
@@ -284,12 +320,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func showSettings() { SettingsWindowController.shared.show() }
+    func showSettings() {
+        holdWorkspace(for: 1.5)
+        SettingsWindowController.shared.show()
+    }
 
     @objc private func tabMenuItem(_ sender: NSMenuItem) { strip.select(index: sender.tag) }
     @objc private func addApplication() { strip.addApplication() }
     @objc private func runSelfTest() { SelfTest.run(controller: strip) }
-    @objc private func showLog() { LogWindow.shared.show() }
+    @objc private func showLog() {
+        holdWorkspace(for: 1.5)
+        LogWindow.shared.show()
+    }
     @objc private func openAXSettings() { AXPermission.openSettings() }
     @objc private func openSettings() { showSettings() }
     @objc private func diagnoseTabs() { LogWindow.shared.show(); diagnose() }
@@ -383,6 +425,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func nagAboutPermission() {
+        holdWorkspace(for: 30)
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = "Host needs Accessibility permission"
