@@ -10,8 +10,12 @@ enum ThemeStyle {
     case polkaDots(background: NSColor, dots: [NSColor])
     case packedCircles(background: NSColor, circles: [NSColor], seed: UInt64)
     case triangles([NSColor], seed: UInt64)
-    case sunflowers(background: NSColor, petals: [NSColor], centre: NSColor)
-    case roses(background: NSColor, petals: [NSColor], leaves: NSColor)
+    /// An irregular triangulation rather than a repeating pattern.
+    case mesh([NSColor], seed: UInt64)
+    /// Dense, freely scattered dots of widely varying size.
+    case kusamaDots(background: NSColor, dots: [NSColor], seed: UInt64)
+    /// Soft overlapping radial washes that bleed into one another.
+    case watercolour(background: NSColor, washes: [NSColor], seed: UInt64)
     case diamonds(background: NSColor, diamonds: [NSColor])
     case waves(background: NSColor, waves: [NSColor], spacing: CGFloat, amplitude: CGFloat)
     case bubbles(background: NSColor, bubbles: [NSColor], seed: UInt64)
@@ -109,12 +113,14 @@ struct Theme {
                               seed: seed, tiled: stripeWidth != nil)
         case .triangles(let colours, let seed):
             drawTriangles(in: path, colours: colours, seed: seed, tiled: stripeWidth != nil)
-        case .sunflowers(let background, let petals, let centre):
-            drawSunflowers(in: path, background: background, petals: petals,
-                           centre: centre, tiled: stripeWidth != nil)
-        case .roses(let background, let petals, let leaves):
-            drawRoses(in: path, background: background, petals: petals,
-                      leaves: leaves, tiled: stripeWidth != nil)
+        case .mesh(let colours, let seed):
+            drawMesh(in: path, colours: colours, seed: seed, tiled: stripeWidth != nil)
+        case .kusamaDots(let background, let dots, let seed):
+            drawKusamaDots(in: path, background: background, dots: dots,
+                           seed: seed, tiled: stripeWidth != nil)
+        case .watercolour(let background, let washes, let seed):
+            drawWatercolour(in: path, background: background, washes: washes,
+                            seed: seed, tiled: stripeWidth != nil)
         case .diamonds(let background, let diamonds):
             drawDiamonds(in: path, background: background, colours: diamonds,
                          tiled: stripeWidth != nil)
@@ -242,83 +248,104 @@ struct Theme {
         }
     }
 
-    private func drawSunflowers(in path: NSBezierPath, background: NSColor,
-                                petals: [NSColor], centre: NSColor, tiled: Bool) {
-        clipped(path, background: background) { bounds in
-            let spacing = tiled ? CGFloat(42) : bounds.width / 4
-            var row = 0
-            var y = bounds.minY - spacing / 2
-            while y < bounds.maxY + spacing {
-                var column = 0
-                var x = bounds.minX + (row.isMultiple(of: 2) ? 0 : spacing / 2)
-                while x < bounds.maxX + spacing {
-                    let flowerCentre = CGPoint(x: x, y: y)
-                    for petal in 0..<10 {
-                        let angle = CGFloat(petal) * .pi / 5
-                        let petalCentre = CGPoint(x: x + cos(angle) * spacing * 0.18,
-                                                 y: y + sin(angle) * spacing * 0.18)
-                        petals[(row + column + petal) % petals.count].setFill()
-                        NSBezierPath(ovalIn: CGRect(x: petalCentre.x - spacing * 0.07,
-                                                   y: petalCentre.y - spacing * 0.12,
-                                                   width: spacing * 0.14, height: spacing * 0.24)).fill()
-                    }
-                    centre.setFill()
-                    NSBezierPath(ovalIn: CGRect(x: flowerCentre.x - spacing * 0.10,
-                                               y: flowerCentre.y - spacing * 0.10,
-                                               width: spacing * 0.20, height: spacing * 0.20)).fill()
-                    column += 1
-                    x += spacing
+    /// A triangular mesh: a grid of points, each pushed off its lattice position,
+    /// with the quad between them split along a diagonal chosen at random.
+    ///
+    /// Jittering the points rather than the cells is what stops it reading as a
+    /// pattern -- neighbouring triangles share the displaced corners, so the seams
+    /// run continuously across the surface instead of repeating.
+    private func drawMesh(in path: NSBezierPath, colours: [NSColor],
+                          seed initialSeed: UInt64, tiled: Bool) {
+        clipped(path, background: colours[0]) { bounds in
+            var seed = initialSeed
+            func random() -> CGFloat {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return CGFloat((seed >> 33) % 100_000) / 100_000
+            }
+            let cell = tiled ? CGFloat(26) : bounds.width / 7
+            let columns = Int(ceil(bounds.width / cell)) + 2
+            let rows = Int(ceil(bounds.height / cell)) + 2
+
+            var points: [[CGPoint]] = []
+            for row in 0...rows {
+                var line: [CGPoint] = []
+                for column in 0...columns {
+                    line.append(CGPoint(
+                        x: bounds.minX - cell + CGFloat(column) * cell + (random() - 0.5) * cell * 0.8,
+                        y: bounds.minY - cell + CGFloat(row) * cell + (random() - 0.5) * cell * 0.8))
                 }
-                row += 1
-                y += spacing
+                points.append(line)
+            }
+
+            for row in 0..<rows {
+                for column in 0..<columns {
+                    let a = points[row][column], b = points[row][column + 1]
+                    let c = points[row + 1][column], d = points[row + 1][column + 1]
+                    let triangles = random() < 0.5 ? [[a, b, d], [a, d, c]] : [[a, b, c], [b, d, c]]
+                    for triangle in triangles {
+                        colours[Int(random() * CGFloat(colours.count)) % colours.count].setFill()
+                        let shape = NSBezierPath()
+                        shape.move(to: triangle[0])
+                        shape.line(to: triangle[1])
+                        shape.line(to: triangle[2])
+                        shape.close()
+                        shape.fill()
+                        // Stroked in its own colour so the seams close: adjacent
+                        // fills otherwise leave hairline gaps where they meet.
+                        shape.lineWidth = 0.7
+                        shape.stroke()
+                    }
+                }
             }
         }
     }
 
-    private func drawRoses(in path: NSBezierPath, background: NSColor,
-                           petals: [NSColor], leaves: NSColor, tiled: Bool) {
+    /// Kusama rather than a tablecloth: no lattice, and a size distribution
+    /// weighted so most dots are small and a few are very large.
+    private func drawKusamaDots(in path: NSBezierPath, background: NSColor,
+                                dots: [NSColor], seed initialSeed: UInt64, tiled: Bool) {
         clipped(path, background: background) { bounds in
-            let spacing = tiled ? CGFloat(30) : bounds.width / 6
-            var row = 0
-            var y = bounds.minY - spacing / 2
-            while y < bounds.maxY + spacing {
-                var column = 0
-                var x = bounds.minX + (row.isMultiple(of: 2) ? 0 : spacing / 2)
-                while x < bounds.maxX + spacing {
-                    leaves.setFill()
-                    for direction: CGFloat in [-1, 1] {
-                        let leaf = NSBezierPath(ovalIn: CGRect(
-                            x: x + direction * spacing * 0.13 - spacing * 0.10,
-                            y: y - spacing * 0.04,
-                            width: spacing * 0.20,
-                            height: spacing * 0.10
-                        ))
-                        leaf.fill()
-                    }
+            var seed = initialSeed
+            func random() -> CGFloat {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return CGFloat((seed >> 33) % 100_000) / 100_000
+            }
+            let scale = tiled ? max(bounds.height, 44) : bounds.width
+            let count = max(90, Int(bounds.width * bounds.height / (scale * scale) * 380))
+            for dot in 0..<count {
+                // Raising a uniform value to a power biases it towards zero, which
+                // gives a field of small dots punctuated by occasional big ones.
+                let radius = scale * (0.006 + pow(random(), 2.4) * 0.085)
+                let centre = CGPoint(x: bounds.minX + random() * bounds.width,
+                                     y: bounds.minY + random() * bounds.height)
+                dots[dot % dots.count].setFill()
+                NSBezierPath(ovalIn: CGRect(x: centre.x - radius, y: centre.y - radius,
+                                            width: radius * 2, height: radius * 2)).fill()
+            }
+        }
+    }
 
-                    for ring in stride(from: 3, through: 1, by: -1) {
-                        let radius = spacing * CGFloat(ring) * 0.055
-                        for petal in 0..<5 {
-                            let angle = CGFloat(petal) * 2 * .pi / 5 + CGFloat(ring) * 0.35
-                            let centre = CGPoint(x: x + cos(angle) * radius,
-                                                 y: y + sin(angle) * radius)
-                            petals[(row + column + ring + petal) % petals.count].setFill()
-                            NSBezierPath(ovalIn: CGRect(x: centre.x - radius * 0.85,
-                                                       y: centre.y - radius * 0.65,
-                                                       width: radius * 1.7,
-                                                       height: radius * 1.3)).fill()
-                        }
-                    }
-
-                    petals.last?.setFill()
-                    let heart = spacing * 0.055
-                    NSBezierPath(ovalIn: CGRect(x: x - heart, y: y - heart,
-                                               width: heart * 2, height: heart * 2)).fill()
-                    column += 1
-                    x += spacing
-                }
-                row += 1
-                y += spacing
+    /// Overlapping radial washes, each fading to nothing at its edge, so where two
+    /// meet the colour pools the way wet pigment does.
+    private func drawWatercolour(in path: NSBezierPath, background: NSColor,
+                                 washes: [NSColor], seed initialSeed: UInt64, tiled: Bool) {
+        clipped(path, background: background) { bounds in
+            var seed = initialSeed
+            func random() -> CGFloat {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return CGFloat((seed >> 33) % 100_000) / 100_000
+            }
+            let scale = tiled ? max(bounds.height, 44) : bounds.width
+            let count = max(16, Int(bounds.width * bounds.height / (scale * scale) * 30))
+            for wash in 0..<count {
+                let colour = washes[wash % washes.count]
+                let radius = scale * (0.12 + random() * 0.30)
+                let centre = CGPoint(x: bounds.minX + random() * bounds.width,
+                                     y: bounds.minY + random() * bounds.height)
+                let gradient = NSGradient(colors: [colour.withAlphaComponent(0.30 + random() * 0.24),
+                                                   colour.withAlphaComponent(0)])
+                gradient?.draw(fromCenter: centre, radius: 0,
+                               toCenter: centre, radius: radius, options: [])
             }
         }
     }
@@ -511,10 +538,11 @@ extension Theme {
               ink: rgb(0.22, 0.01, 0.12), text: .white, chip: rgb(0.45, 0.00, 0.25)),
 
         Theme(id: "rose-garden", name: "Rose Garden",
-              style: .roses(background: rgb(1.00, 0.91, 0.94),
-                            petals: [rgb(0.98, 0.55, 0.68), rgb(0.91, 0.26, 0.45),
-                                      rgb(0.72, 0.10, 0.30)],
-                            leaves: rgb(0.43, 0.62, 0.42)),
+              style: .watercolour(background: rgb(1.00, 0.95, 0.96),
+                                  washes: [rgb(0.97, 0.62, 0.71), rgb(0.89, 0.35, 0.50),
+                                           rgb(0.75, 0.20, 0.38), rgb(0.94, 0.76, 0.78),
+                                           rgb(0.62, 0.35, 0.45), rgb(0.83, 0.55, 0.62)],
+                                  seed: 0x8055E),
               ink: rgb(0.31, 0.08, 0.15), text: rgb(0.28, 0.07, 0.13), chip: rgb(1.00, 0.96, 0.97)),
 
         Theme(id: "rainbow", name: "Rainbow",
@@ -582,9 +610,9 @@ extension Theme {
               ink: rgb(0.63, 1.00, 0.68), text: rgb(0.76, 1.00, 0.79), chip: rgb(0.02, 0.16, 0.10)),
 
         Theme(id: "sunflowers", name: "Sunflowers",
-              style: .sunflowers(background: rgb(0.18, 0.39, 0.22),
-                                  petals: [rgb(1.00, 0.80, 0.06), rgb(0.95, 0.56, 0.02)],
-                                  centre: rgb(0.27, 0.12, 0.04)),
+              style: .stripes([rgb(1.00, 0.96, 0.76), rgb(1.00, 0.87, 0.32), rgb(1.00, 0.75, 0.09),
+                               rgb(0.93, 0.58, 0.06), rgb(0.60, 0.44, 0.10), rgb(0.27, 0.40, 0.20),
+                               rgb(0.18, 0.30, 0.16)]),
               ink: rgb(0.19, 0.09, 0.03), text: rgb(0.20, 0.10, 0.03), chip: rgb(1.00, 0.88, 0.35)),
 
         Theme(id: "silver-black", name: "Silver / Black",
@@ -599,8 +627,11 @@ extension Theme {
               ink: .white, text: .white, chip: rgb(0.11, 0.11, 0.11)),
 
         Theme(id: "polka-dots", name: "Polka Dots",
-              style: .polkaDots(background: rgb(0.98, 0.88, 0.86),
-                                dots: [rgb(0.91, 0.19, 0.29), rgb(0.16, 0.57, 0.73), rgb(0.98, 0.65, 0.12)]),
+              style: .kusamaDots(background: rgb(0.99, 0.93, 0.91),
+                                 dots: [rgb(0.86, 0.12, 0.22), rgb(0.10, 0.12, 0.18),
+                                        rgb(0.93, 0.55, 0.10), rgb(0.16, 0.52, 0.68),
+                                        rgb(0.86, 0.12, 0.22), rgb(0.10, 0.12, 0.18)],
+                                 seed: 0x4B5A3A),
               ink: rgb(0.18, 0.12, 0.15), text: rgb(0.17, 0.10, 0.13), chip: rgb(1.00, 0.97, 0.94)),
 
         Theme(id: "circle-packing", name: "Circle Packing",
@@ -611,9 +642,9 @@ extension Theme {
               ink: .white, text: .white, chip: rgb(0.08, 0.08, 0.14)),
 
         Theme(id: "delaunay-triangles", name: "Delaunay Triangles",
-              style: .triangles([rgb(0.96, 0.32, 0.22), rgb(0.99, 0.62, 0.18), rgb(0.98, 0.84, 0.28),
-                                 rgb(0.19, 0.68, 0.62), rgb(0.16, 0.43, 0.68), rgb(0.39, 0.24, 0.59)],
-                                seed: 0xDE1A0A7),
+              style: .mesh([rgb(0.96, 0.32, 0.22), rgb(0.99, 0.62, 0.18), rgb(0.98, 0.84, 0.28),
+                            rgb(0.19, 0.68, 0.62), rgb(0.16, 0.43, 0.68), rgb(0.39, 0.24, 0.59)],
+                           seed: 0xDE1A0A7),
               ink: rgb(0.08, 0.08, 0.12), text: rgb(0.10, 0.08, 0.12), chip: rgb(0.98, 0.94, 0.86)),
 
         Theme(id: "harlequin", name: "Harlequin",

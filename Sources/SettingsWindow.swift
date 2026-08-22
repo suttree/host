@@ -16,6 +16,12 @@ private final class FlippedView: NSView {
 final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
 
+    /// Both sections share one column system, so the theme swatches and the icons
+    /// line up rather than reading as two unrelated grids.
+    private static let columns = 5
+    private static let cellWidth: CGFloat = 100
+    private static let swatchSize = NSSize(width: 92, height: 34)
+
     private var themeButtons: [NSButton] = []
     private var iconButtons: [NSButton] = []
     private var followCheckbox: NSButton!
@@ -31,20 +37,38 @@ final class SettingsWindowController: NSWindowController {
                               styleMask: [.titled, .closable, .resizable],
                               backing: .buffered, defer: false)
         window.minSize = NSSize(width: 560, height: 360)
+        // Above the tab strip. The strip floats so it can sit on top of the app it
+        // hosts, which means a normal-level settings window opens underneath it.
+        window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
         window.title = "Host Settings"
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.contentView = buildContent()
         window.center()
+        clampToScreen()
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// Keep the whole window on screen. center() places a tall window high enough
+    /// that its title bar can end up above the visible frame, out of reach.
+    private func clampToScreen() {
+        guard let window, let screen = window.screen ?? NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        var frame = window.frame
+        frame.size.height = min(frame.height, visible.height)
+        frame.origin.y = min(max(frame.minY, visible.minY), visible.maxY - frame.height)
+        frame.origin.x = min(max(frame.minX, visible.minX), visible.maxX - frame.width)
+        window.setFrame(frame, display: false)
+        Log.line("settings window \(NSStringFromRect(frame)) inside \(NSStringFromRect(visible))")
+    }
 
     func show() {
         // The strip is a non-activating panel, so Host is not frontmost when the
         // cog is clicked. Without this the settings window opens behind whatever is.
         NSApp.activate(ignoringOtherApps: true)
         refresh()
+        clampToScreen()
         window?.makeKeyAndOrderFront(nil)
         if let scroll = window?.contentView as? NSScrollView,
            let document = scroll.documentView {
@@ -65,10 +89,10 @@ final class SettingsWindowController: NSWindowController {
 
         root.addArrangedSubview(heading("Tab bar theme"))
         themeButtons = Theme.all.enumerated().map { index, theme in
-            swatchButton(image: theme.swatch(size: NSSize(width: 140, height: 34)),
+            swatchButton(image: theme.swatch(size: Self.swatchSize),
                          title: theme.name, tag: index, action: #selector(themeChosen(_:)))
         }
-        root.addArrangedSubview(grid(themeButtons, columns: 3, cellWidth: 150))
+        root.addArrangedSubview(grid(themeButtons, columns: Self.columns, cellWidth: Self.cellWidth))
 
         root.addArrangedSubview(separator())
 
@@ -85,7 +109,7 @@ final class SettingsWindowController: NSWindowController {
             return swatchButton(image: image, title: theme.name, tag: index,
                                 action: #selector(iconChosen(_:)))
         }
-        root.addArrangedSubview(grid(iconButtons, columns: 5, cellWidth: 96))
+        root.addArrangedSubview(grid(iconButtons, columns: Self.columns, cellWidth: Self.cellWidth))
 
         let container = FlippedView()
         container.translatesAutoresizingMaskIntoConstraints = false
