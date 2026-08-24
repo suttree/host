@@ -138,6 +138,9 @@ final class TabStripController: NSObject, NSWindowDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(appDidActivate(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(appDidTerminate(_:)),
+            name: NSWorkspace.didTerminateApplicationNotification, object: nil)
         rebuild()
     }
 
@@ -546,6 +549,43 @@ final class TabStripController: NSObject, NSWindowDelegate {
     private func rememberActiveTab(index: Int) {
         guard workspace.tabs.indices.contains(index) else { return }
         UserDefaults.standard.set(workspace.tabs[index].bundleIdentifier, forKey: Self.activeTabKey)
+    }
+
+    // MARK: - Quitting
+
+    /// Quitting an app closes its tab and moves you to the next one still running.
+    ///
+    /// "Next open application" rather than simply the next tab: the tab after it
+    /// may be an app that is not running, and selecting that would launch it --
+    /// quitting one thing is a poor reason to start another.
+    @objc private func appDidTerminate(_ note: Notification) {
+        guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              let id = app.bundleIdentifier,
+              let index = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) else { return }
+
+        let removed = workspace.tabs.remove(at: index)
+        WindowManager.shared.forget(bundleID: id)
+        if let active = activeIndex {
+            if active == index { activeIndex = nil }
+            else if active > index { activeIndex = active - 1 }
+        }
+        Store.save(workspace)
+        rebuild()
+        AppDelegate.shared?.registerHotKeys()
+        Log.line("\(removed.name) quit; tab closed")
+
+        guard !workspace.tabs.isEmpty else { return }
+        // Start at the removed position so focus moves forwards through the strip,
+        // wrapping round rather than stopping at the end.
+        for offset in 0..<workspace.tabs.count {
+            let candidate = (index + offset) % workspace.tabs.count
+            if WindowManager.runningApp(workspace.tabs[candidate].bundleIdentifier) != nil {
+                Log.line("  moving to \(workspace.tabs[candidate].name)")
+                select(index: candidate)
+                return
+            }
+        }
+        Log.line("  nothing else in the workspace is running; leaving focus where it is")
     }
 
     // MARK: - Reordering by dragging

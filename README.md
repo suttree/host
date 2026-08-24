@@ -25,6 +25,10 @@ apps, wrapping at either end.
   fight over the same bound window and geometry state.
 - Right-click a tab to remove it. The app keeps running and its window stays put
   — removing a tab is forgetting about an app, not closing it
+- Quitting an app closes its tab and moves you to the next tab that is still
+  running. Note this is in tension with launching on demand: a tab only survives
+  as long as its app does, so a workspace holds running apps rather than a
+  standing set of them
 - **Resizing or moving the hosted window drags the strip with it**: the strip
   re-derives the workspace from the window and matches its width exactly
 - Dragging the strip moves the whole workspace, and every tab's window follows,
