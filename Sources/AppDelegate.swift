@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.startFile()
 
         buildMainMenu()
+        applyApplicationIcon()
 
         let workspace = Store.load()
         strip = TabStripController(workspace: workspace)
@@ -21,8 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.line("host up. tabs: \(strip.workspace.tabs.map(\.name).joined(separator: ", "))")
         Log.line("workspace rect \(NSStringFromRect(strip.workspace.frame))")
         Log.line("accessibility trusted: \(AXPermission.isTrusted)")
-        Log.line("theme: \(Theme.current.name)  icon: \(Theme.iconTheme.name)" +
-                 (Theme.iconFollowsTheme ? " (matched)" : " (chosen)"))
+        Log.line("theme: \(Theme.current.name)")
 
         if !AXPermission.isTrusted {
             strip.raiseStrip()
@@ -299,30 +299,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshAppearance()
     }
 
-    func apply(iconTheme: Theme) {
-        Theme.setIconTheme(iconTheme)
-        Log.line("icon theme: \(iconTheme.name)")
-        refreshAppearance()
-    }
-
-    /// Repaints the strip and redraws the Dock icon from whatever is stored.
-    ///
-    /// The Dock icon is drawn in process rather than swapped on disk: rewriting a
-    /// signed bundle's .icns would break the code signature, and with it the
-    /// Accessibility grant. applicationIconImage is an in-memory property that
-    /// macOS forgets on relaunch, so this runs again at every launch.
+    /// Repaints the strip after a theme change.
     func refreshAppearance() {
         strip.applyTheme()
         rebuildViewMenu()
         SettingsWindowController.shared.refresh()
 
-        DispatchQueue.main.async {
-            guard let artwork = IconRenderer.fromBundle() else {
-                Log.line("  no artwork in the bundle; Dock icon left alone")
-                return
-            }
-            NSApp.applicationIconImage = IconRenderer.dockImage(theme: Theme.iconTheme, artwork: artwork)
+    }
+
+    /// Ask the asset catalog for the icon in the current system appearance.
+    /// This keeps the Dock icon aligned with the light/dark app-icon variants.
+    private func applyApplicationIcon() {
+        guard let icon = NSImage(named: NSImage.Name("AppIcon")) else { return }
+        guard NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua else {
+            NSApp.applicationIconImage = icon
+            return
         }
+
+        let size = NSSize(width: 512, height: 512)
+        let white = NSImage(size: size)
+        white.lockFocus()
+        icon.draw(in: NSRect(origin: .zero, size: size))
+        NSColor.white.set()
+        NSRect(origin: .zero, size: size).fill(using: .sourceAtop)
+        white.unlockFocus()
+        NSApp.applicationIconImage = white
     }
 
     func showSettings() {

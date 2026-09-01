@@ -18,7 +18,7 @@
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
-	<key>CFBundleIconFile</key>
+	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>

@@ -732,31 +732,11 @@ extension Theme {
 
     // MARK: - Persistence
     //
-    // The strip's theme and the icon's theme are stored separately, so a Hacker
-    // strip can sit under a Sunset icon. By default the icon follows the strip;
-    // choosing an icon explicitly breaks the link.
-
     private static let key = "HostTheme"
-    private static let iconKey = "HostIconTheme"
-    private static let linkKey = "HostIconFollowsTheme"
 
     static var current: Theme {
         get { named(UserDefaults.standard.string(forKey: key)) }
         set { UserDefaults.standard.set(newValue.id, forKey: key) }
-    }
-
-    static var iconFollowsTheme: Bool {
-        get { UserDefaults.standard.object(forKey: linkKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: linkKey) }
-    }
-
-    static var iconTheme: Theme {
-        iconFollowsTheme ? current : named(UserDefaults.standard.string(forKey: iconKey))
-    }
-
-    static func setIconTheme(_ theme: Theme) {
-        UserDefaults.standard.set(theme.id, forKey: iconKey)
-        iconFollowsTheme = false
     }
 
     /// A small sample of how this theme paints the strip, for the settings window.

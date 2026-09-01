@@ -16,15 +16,11 @@ private final class FlippedView: NSView {
 final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
 
-    /// Both sections share one column system, so the theme swatches and the icons
-    /// line up rather than reading as two unrelated grids.
     private static let columns = 5
     private static let cellWidth: CGFloat = 100
     private static let swatchSize = NSSize(width: 92, height: 34)
 
     private var themeButtons: [NSButton] = []
-    private var iconButtons: [NSButton] = []
-    private var followCheckbox: NSButton!
 
     private init() {
         // Resizable, and as tall as the screen sensibly allows. With 33 themes the
@@ -32,7 +28,7 @@ final class SettingsWindowController: NSWindowController {
         // grown leaves whole sections reachable only by scrolling -- or not at all
         // if the scroll view's own height is wrong.
         let available = NSScreen.main?.visibleFrame.height ?? 800
-        let height = min(760, max(460, available - 120))
+        let height = min(560, max(400, available - 120))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: height),
                               styleMask: [.titled, .closable, .resizable],
                               backing: .buffered, defer: false)
@@ -114,23 +110,6 @@ final class SettingsWindowController: NSWindowController {
                          title: theme.name, tag: index, action: #selector(themeChosen(_:)))
         }
         root.addArrangedSubview(grid(themeButtons, columns: Self.columns, cellWidth: Self.cellWidth))
-
-        root.addArrangedSubview(separator())
-
-        root.addArrangedSubview(heading("App icon"))
-        followCheckbox = NSButton(checkboxWithTitle: "Match the tab bar theme",
-                                  target: self, action: #selector(followToggled(_:)))
-        root.addArrangedSubview(followCheckbox)
-
-        let artwork = IconRenderer.fromBundle()
-        iconButtons = Theme.sorted.enumerated().map { index, theme in
-            let rep = IconRenderer.render(theme: theme, size: 128, artwork: artwork)
-            let image = NSImage(size: NSSize(width: 64, height: 64))
-            image.addRepresentation(rep)
-            return swatchButton(image: image, title: theme.name, tag: index,
-                                action: #selector(iconChosen(_:)))
-        }
-        root.addArrangedSubview(grid(iconButtons, columns: Self.columns, cellWidth: Self.cellWidth))
 
         let container = FlippedView()
         container.translatesAutoresizingMaskIntoConstraints = false
@@ -246,22 +225,11 @@ final class SettingsWindowController: NSWindowController {
     // MARK: - State
 
     func refresh() {
-        guard followCheckbox != nil else { return }
         let theme = Theme.current
-        let icon = Theme.iconTheme
         for (index, button) in themeButtons.enumerated() {
             button.layer?.borderColor = Theme.sorted[index].id == theme.id
                 ? NSColor.controlAccentColor.cgColor : NSColor.clear.cgColor
         }
-        for (index, button) in iconButtons.enumerated() {
-            button.layer?.borderColor = Theme.sorted[index].id == icon.id
-                ? NSColor.controlAccentColor.cgColor : NSColor.clear.cgColor
-            // Deliberately never disabled. Dimming them out while "match" is
-            // ticked means you have to untick first to do the obvious thing;
-            // clicking an icon simply unticks it for you.
-            button.alphaValue = 1
-        }
-        followCheckbox.state = Theme.iconFollowsTheme ? .on : .off
     }
 
     @objc private func themeChosen(_ sender: NSButton) {
@@ -269,13 +237,4 @@ final class SettingsWindowController: NSWindowController {
         AppDelegate.shared?.apply(theme: Theme.sorted[sender.tag])
     }
 
-    @objc private func iconChosen(_ sender: NSButton) {
-        guard Theme.sorted.indices.contains(sender.tag) else { return }
-        AppDelegate.shared?.apply(iconTheme: Theme.sorted[sender.tag])
-    }
-
-    @objc private func followToggled(_ sender: NSButton) {
-        Theme.iconFollowsTheme = sender.state == .on
-        AppDelegate.shared?.refreshAppearance()
-    }
 }

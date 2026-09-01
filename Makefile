@@ -14,11 +14,10 @@ INSTALL := /Applications/$(APP).app
 
 all: $(BUNDLE)
 
-$(BUNDLE): $(SOURCES) Resources/Info.plist Resources/AppIcon.icns Resources/artwork.png Makefile
+$(BUNDLE): $(SOURCES) Resources/Info.plist Resources/Assets.xcassets Makefile
 	@mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources
 	@cp Resources/Info.plist $(BUNDLE)/Contents/Info.plist
-	@cp Resources/AppIcon.icns $(BUNDLE)/Contents/Resources/AppIcon.icns
-	@cp Resources/artwork.png $(BUNDLE)/Contents/Resources/artwork.png
+	@xcrun actool Resources/Assets.xcassets --compile $(BUNDLE)/Contents/Resources --app-icon AppIcon --platform macosx --minimum-deployment-target 13.0 --output-partial-info-plist $(BUNDLE)/Contents/Resources/asset-info.plist --output-format human-readable-text
 	swiftc -target $(TARGET) -O -o $(BUNDLE)/Contents/MacOS/$(APP) $(SOURCES)
 ifeq ($(IDENTITY),)
 	@echo "--- signing ad hoc: macOS will revoke Accessibility on every rebuild."
@@ -62,20 +61,6 @@ test:
 reset-permission:
 	@tccutil reset Accessibility $(shell /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' Resources/Info.plist)
 	@echo "grant cleared -- relaunch and approve again"
-
-# ARTWORK is black line art on a white ground; it is composited with multiply so
-# the white drops out. Override the path if the source moves.
-ARTWORK ?= Resources/artwork.png
-# Which theme the bundled .icns is drawn in. The running app can switch freely
-# via the View menu; this is only what a fresh install starts as.
-THEME   ?= sunset-stripes
-
-icon:
-	@mkdir -p build
-	@swiftc -o build/icongen tools/icongen/main.swift Sources/Theme.swift Sources/IconRenderer.swift
-	@./build/icongen build/Host.iconset $(ARTWORK) $(THEME)
-	@iconutil -c icns build/Host.iconset -o Resources/AppIcon.icns
-	@echo "wrote Resources/AppIcon.icns"
 
 # Accessibility grants are keyed to the code signature. An ad-hoc signature
 # changes on every build, so macOS silently revokes the grant and you re-approve

@@ -132,15 +132,8 @@ Space, so the check goes through `CGWindowListCopyWindowInfo`.
 
 ## Themes
 
-`Sources/Theme.swift` holds the palettes and pattern renderers;
-`Sources/IconRenderer.swift` composites the line drawing onto one. Both are
-compiled into the app *and* into the icon tool, so the .icns on disk and the icon
-the app draws at runtime come from the same code.
-
-The Dock icon is redrawn in process rather than swapped on disk. Rewriting a
-signed bundle's .icns would break the code signature and take the Accessibility
-grant with it. `NSApplication.applicationIconImage` is an in-memory property
-macOS forgets on relaunch, so the stored theme is re-applied at every launch.
+`Sources/Theme.swift` holds the palettes and pattern renderers for the tab strip.
+The fixed app icon is stored in `Resources/Assets.xcassets`.
 
 Every tab sits on a solid card in the theme's `chip` colour, off-white for the
 daylight themes and dark for Galaxy, Starry Night and Hacker. That card is what
@@ -285,10 +278,7 @@ Sources/
   SelfTest.swift       ten-switch drift measurement, log window
   AppDelegate.swift    wiring, status item, permission nag
 tools/make-identity.sh stable self-signed signing identity
-  Theme.swift          palettes and pattern drawing, shared by the
-                       tab strip and the app icon
-  IconRenderer.swift   masks and crops the line art, composites it onto a theme
-  SettingsWindow.swift the theme and app icon pickers, opened from the cog
-tools/icongen/         writes the .iconset; `make icon` regenerates AppIcon.icns
-Resources/artwork.png  the line drawing, black on white
+  Theme.swift          palettes and pattern drawing for the tab strip
+  SettingsWindow.swift the tab-bar theme picker, opened from the cog
+Resources/Assets.xcassets fixed app icon asset catalog
 ```
