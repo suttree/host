@@ -311,6 +311,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
             return
         }
         let tab = workspace.tabs[index]
+        hideOtherTabs(except: tab.bundleIdentifier)
         activeIndex = index
         rememberActiveTab(index: index)
         highlight(index)
@@ -348,10 +349,33 @@ final class TabStripController: NSObject, NSWindowDelegate {
     }
 
     func selectRelative(offset: Int) {
+        guard isWorkspaceFront else {
+            Log.line("ignored tab hotkey while another app is foregrounded")
+            return
+        }
         guard let index = relativeTabIndex(activeIndex: activeIndex,
                                            tabCount: workspace.tabs.count,
                                            offset: offset) else { return }
         select(index: index)
+    }
+
+    /// Keep only the selected hosted app visible. This is also called from the
+    /// activation notification path, so command-tab and Dock activation follow
+    /// the same one-app-at-a-time rule as clicking a tab.
+    private func hideOtherTabs(except bundleID: String) {
+        let others = workspace.tabs
+            .filter { $0.bundleIdentifier != bundleID }
+            .compactMap { WindowManager.runningApp($0.bundleIdentifier) }
+            .filter { !$0.isHidden }
+        guard !others.isEmpty else { return }
+
+        isBulkHiding = true
+        others.forEach { $0.hide() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            let stillVisible = others.filter { !$0.isHidden }
+            if !stillVisible.isEmpty { stillVisible.forEach { $0.hide() } }
+            self.isBulkHiding = false
+        }
     }
 
     @objc private func addClicked() { addApplication() }
@@ -660,6 +684,7 @@ final class TabStripController: NSObject, NSWindowDelegate {
             activeIndex = index
             rememberActiveTab(index: index)
             highlight(index)
+            hideOtherTabs(except: id)
             // Reached without clicking its tab, so nothing has sized it. Snapping
             // here is what stops a tab being active while its window sits at
             // whatever size the app itself last decided on.
