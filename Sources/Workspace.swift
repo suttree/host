@@ -38,6 +38,10 @@ struct Workspace: Codable {
     var tabs: [AppTab]
     var frameString: String
 
+    func hosts(bundleIdentifier: String) -> Bool {
+        tabs.contains { $0.bundleIdentifier == bundleIdentifier && !$0.isDetached }
+    }
+
     /// Toggle a saved tab, or remember an unsaved running app as detached.
     @discardableResult
     mutating func toggleDetached(name: String, bundleIdentifier: String) -> Bool {

@@ -3,6 +3,15 @@ import Foundation
 @main
 struct RunningAppOrderTests {
     static func main() {
+        // Finder or another unhosted app becoming active must leave the bar hidden.
+        assert(!shouldRestoreHiddenHeader(isHiding: false, appIsHidden: false, appIsHosted: false))
+        assert(!shouldRestoreHiddenHeader(isHiding: true, appIsHidden: false, appIsHosted: true))
+        assert(!shouldRestoreHiddenHeader(isHiding: false, appIsHidden: true, appIsHosted: true))
+        assert(shouldRestoreHiddenHeader(isHiding: false, appIsHidden: false, appIsHosted: true))
+        assert(appSearchMatches(name: "Firefox", query: "  FIRE  "))
+        assert(appSearchMatches(name: "Mail", query: "ai"))
+        assert(!appSearchMatches(name: "Firefox", query: "mail"))
+        assert(!appSearchMatches(name: "Firefox", query: "  "))
         assert(fittingLabelCount(widths: [100, 90, 80], available: 270) == 3)
         assert(fittingLabelCount(widths: [100, 90, 80], available: 160) == 1)
         assert(fittingLabelCount(widths: [100, 90, 80], available: 90) == 0)

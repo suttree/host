@@ -1,5 +1,14 @@
 import Foundation
 
+func shouldRestoreHiddenHeader(isHiding: Bool, appIsHidden: Bool, appIsHosted: Bool) -> Bool {
+    !isHiding && !appIsHidden && appIsHosted
+}
+
+func appSearchMatches(name: String, query: String) -> Bool {
+    let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    return !query.isEmpty && name.localizedCaseInsensitiveContains(query)
+}
+
 /// Keep a prefix of recent app labels while reserving space for every icon.
 func fittingLabelCount(widths: [Double], available: Double, compactWidth: Double = 30) -> Int {
     var remaining = available - Double(widths.count) * compactWidth
