@@ -1037,6 +1037,12 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
         }
         let ours = id == Bundle.main.bundleIdentifier
             || id.map { workspace.hosts(bundleIdentifier: $0) } == true
+            || id.map { bundleID in
+                activeIndex.flatMap { index in
+                    workspace.tabs.indices.contains(index)
+                        && workspace.tabs[index].bundleIdentifier == bundleID ? index : nil
+                } != nil
+            } == true
         // Preview raises the panel independently of isWorkspaceFront, so always
         // restore its level, even when selecting the already-frontmost app.
         isWorkspaceFront = ours
