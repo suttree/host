@@ -224,29 +224,14 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
             }
             button.toolTip = name
 
-            // Every running app gets a context menu. Unhosted apps can be added;
-            // hosted apps can be detached, attached, or removed.
+            // Show only the action that changes this app's attachment state.
             let menu = NSMenu()
-            if let workspaceIndex {
-                // Right-click removes the app from the managed workspace. It stays
-                // in this running-app list until the app itself quits.
-                let remove = NSMenuItem(title: "Stop Hosting \u{201C}\(name)\u{201D}",
-                                        action: #selector(removeTab(_:)), keyEquivalent: "")
-                remove.target = self
-                remove.tag = workspaceIndex
-                menu.addItem(remove)
-                let detach = NSMenuItem(title: workspace.tabs[workspaceIndex].isDetached ? "Attach to Workspace" : "Detach from Workspace",
+            let attached = workspaceIndex.map { !workspace.tabs[$0].isDetached } ?? false
+            let attachment = NSMenuItem(title: "\(attached ? "Detach" : "Attach") \(name)",
                                         action: #selector(toggleDetached(_:)), keyEquivalent: "")
-                detach.target = self
-                detach.tag = workspaceIndex
-                menu.addItem(detach)
-            } else {
-                let add = NSMenuItem(title: "Add to Workspace",
-                                     action: #selector(addRunningApp(_:)), keyEquivalent: "")
-                add.target = self
-                add.representedObject = id
-                menu.addItem(add)
-            }
+            attachment.target = self
+            attachment.representedObject = id
+            menu.addItem(attachment)
             button.menu = menu
 
             stack.addArrangedSubview(button)
@@ -713,12 +698,22 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
     }
 
     @objc private func toggleDetached(_ sender: NSMenuItem) {
-        guard workspace.tabs.indices.contains(sender.tag) else { return }
-        workspace.tabs[sender.tag].isDetached.toggle()
+        guard let id = sender.representedObject as? String else { return }
+        guard let index = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) else {
+            guard let app = WindowManager.runningApp(id) else { return }
+            addTab(name: app.localizedName ?? id, bundleIdentifier: id)
+            return
+        }
+        workspace.tabs[index].isDetached.toggle()
+        let detached = workspace.tabs[index].isDetached
+        if detached {
+            WindowManager.shared.forget(bundleID: id)
+        }
         Store.save(workspace)
         rebuild()
-        Log.line("\(workspace.tabs[sender.tag].name) " +
-                 (workspace.tabs[sender.tag].isDetached ? "detached from" : "attached to") + " workspace")
+        if !detached { select(index: index) }
+        Log.line("\(workspace.tabs[index].name) " +
+                 (detached ? "detached from" : "attached to") + " workspace")
     }
 
     // MARK: - Moving the workspace
