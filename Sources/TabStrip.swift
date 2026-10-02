@@ -828,6 +828,7 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
         guard !workspaceHidden, searchField.isHidden else { return }
         raiseStrip()
         guard let index = activeIndex ?? savedActiveTabIndex() else { return }
+        guard WindowManager.runningApp(workspace.tabs[index].bundleIdentifier) != nil else { return }
         Log.line("restoring workspace: strip + \(workspace.tabs[index].name)")
         select(index: index)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -845,6 +846,7 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
             return
         }
         Log.line("startup restore: \(workspace.tabs[index].name)")
+        guard WindowManager.runningApp(workspace.tabs[index].bundleIdentifier) != nil else { return }
         select(index: index)
     }
 
@@ -912,15 +914,26 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
 
     // MARK: - Quitting
 
-    /// A hosted app can quit without removing its tab. Its bundle ID remains the
-    /// attachment point, so the next launch can restore the app to the workspace.
+    /// Retain hosting preferences, but release the active selection on quit.
     @objc private func appDidTerminate(_ note: Notification) {
         guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               let id = app.bundleIdentifier else { return }
         refreshRunningApps()
-        guard workspace.tabs.contains(where: { $0.bundleIdentifier == id }) else { return }
+        guard let index = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) else { return }
+        let tab = workspace.tabs[index]
         WindowManager.shared.forget(bundleID: id)
-        Log.line("\(id) quit; keeping its tab for automatic reattachment")
+
+        if let active = activeIndex {
+            if active == index {
+                activeIndex = nil
+                isWorkspaceFront = false
+                panel.level = .normal
+            }
+        }
+        Store.save(workspace)
+        rebuild()
+        AppDelegate.shared?.registerHotKeys()
+        Log.line("\(tab.name) quit; retained hosting preference without relaunching")
     }
 
     @objc private func appDidLaunch(_ note: Notification) {
@@ -930,6 +943,7 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
         guard let tab = workspace.tabs.first(where: { $0.bundleIdentifier == id }) else { return }
         Log.line("\(tab.name) relaunched; reattaching to workspace")
         guard !tab.isDetached else { return }
+        WindowManager.shared.resumeTracking(bundleID: id)
         WindowManager.shared.snap(bundleID: id, in: workspace.contentFrame, reason: "relaunched")
     }
 

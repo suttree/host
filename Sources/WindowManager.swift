@@ -100,6 +100,8 @@ final class WindowManager {
             let element = self.appElement(for: app.processIdentifier)
             guard let window = self.waitForWindow(bundleID: bundleID, appElement: element, deadline: 1)
             else { return }
+            self.installObserver(pid: app.processIdentifier, element: element, bundleID: bundleID)
+            self.trackGeometry(pid: app.processIdentifier, bundleID: bundleID, window: window)
             self.reassert(bundleID: bundleID, axRect: axRect, reason: reason, window: window)
         }
     }
@@ -137,6 +139,10 @@ final class WindowManager {
                                                     (wanted ? kCFBooleanTrue : kCFBooleanFalse) as CFTypeRef)
             Log.line("  full screen \(wanted) for \(bundleID): \(error == .success ? "ok" : "failed (\(error.rawValue))")")
         }
+    }
+
+    func resumeTracking(bundleID: String) {
+        queue.async { self.unmanagedBundles.remove(bundleID) }
     }
 
     func forget(bundleID: String) {
