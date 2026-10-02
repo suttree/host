@@ -153,14 +153,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             commit: { [weak self] in self?.strip.commitRunningAppCycle() }
         )
         HotKeyCenter.shared.registerControlP { [weak self] in self?.strip.toggleRunningAppSearch() }
-        if CommandTabOverride.isEnabled {
-            let active = HotKeyCenter.shared.replaceCommandTab(
-                previous: { [weak self] in self?.strip.previewRelative(offset: -1) },
-                next: { [weak self] in self?.strip.previewRelative(offset: 1) },
-                commit: { [weak self] in self?.strip.commitRunningAppCycle() }
-            )
-            Log.line("command-tab override: \(active ? "active" : "unavailable")")
-        }
         rebuildTabsMenu()
         Log.line("hotkeys: option-shift-[ and option-shift-]")
     }

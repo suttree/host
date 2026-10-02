@@ -13,18 +13,14 @@ Then grant Accessibility, click a tab, and run **Tabs › Run Self-test**.
 ## What it does
 
 A floating, non-activating strip at the top of a workspace rectangle. The header
-shows every regular running app in most-recently-used order, like Command-Tab made
-permanent. Clicking any app moves its main window into the rectangle below the
-strip and raises it. Hold `⌥⇧` and use `[` or `]` to preview running apps in MRU
-order. Releasing either modifier switches to the highlighted app, wrapping at
-either end.
-The settings window has an optional **Replace Command-Tab** switch. When enabled,
-`⌘Tab` and `⌘⇧Tab` preview the same list and releasing Command switches apps. If
-macOS cannot install the event filter, its normal app switcher remains in place.
-The newest apps keep labelled tabs. Older apps use compact icon buttons so the
-full list fits in the header. Activating a compact app promotes it into a labelled
-slot and collapses the oldest labelled app. Every button shows the app name when
-you hover over it.
+shows the selected running apps in their saved order. Clicking an attached app
+moves its main window into the rectangle below the strip and raises it. Hold
+`⌥⇧` and use `[` or `]` to preview selected apps. Releasing either modifier switches
+to the highlighted app, wrapping at either end.
+
+`Ctrl-P` opens app search. Type an app name and press Enter to switch to it, or
+Escape to close search. Search includes running apps outside the selected set
+and saved apps that are closed. Command-Tab uses the standard macOS switcher.
 
 - `+` adds an app from `/Applications`, persisted to
   `~/Library/Application Support/Host/workspace.json`. The new tab is selected
@@ -34,10 +30,8 @@ you hover over it.
   fight over the same bound window and geometry state.
 - Right-click an app and choose **Detach from Host** to let its window move and
   resize independently. Choose **Reattach to Host** to restore shared positioning.
-- Quitting an app closes its tab and moves you to the next tab that is still
-  running. A tab lasts as long as its app does, so the strip is a view of what is
-  running rather than a standing set of apps you curate — quit something, add it
-  back with `+` when you next want it
+- Quitting an app removes it from the visible bar but keeps its saved hosting
+  preference. Launching it again restores its tab and attachment.
 - **Resizing or moving the hosted window drags the strip with it**: the strip
   re-derives the workspace from the window and matches its width exactly
 - Dragging the strip moves the whole workspace, and every tab's window follows,
@@ -122,9 +116,8 @@ Left at that level it would also sit on top of every unrelated window on screen.
 Lowering the level permanently is no good either -- it would be buried under the
 very window it belongs to.
 
-So the strip floats while any regular running app is in front. That keeps the
-switcher visible as a permanent fixture. It drops to the normal window level only
-for accessory or background processes, which do not appear in the header.
+The strip floats while Host or a selected app is in front. It drops to the normal
+window level when an unrelated app is active.
 Ordering it out was the first attempt at this and overshot: the strip
 vanished the moment a hosted app lost focus, which made the workspace look like
 it had gone away.

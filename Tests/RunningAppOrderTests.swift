@@ -45,12 +45,5 @@ struct RunningAppOrderTests {
         assert(cycle.commit() == nil)
         assert(cycle.preview(liveOrder: ["music", "notes", "mail"], current: "music",
                              offset: -1) == "mail")
-
-        var commandTab = CommandTabGesture()
-        assert(commandTab.tabPressed(reverse: false) == 1)
-        assert(commandTab.tabPressed(reverse: true) == -1)
-        assert(!commandTab.commandChanged(isDown: true))
-        assert(commandTab.commandChanged(isDown: false))
-        assert(!commandTab.commandChanged(isDown: false))
     }
 }

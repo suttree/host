@@ -21,7 +21,6 @@ final class SettingsWindowController: NSWindowController {
     private static let swatchSize = NSSize(width: 92, height: 34)
 
     private var themeButtons: [NSButton] = []
-    private var commandTabButton: NSButton!
 
     private init() {
         // Resizable, and as tall as the screen sensibly allows. With 33 themes the
@@ -104,23 +103,6 @@ final class SettingsWindowController: NSWindowController {
         root.spacing = 14
         root.edgeInsets = NSEdgeInsets(top: 20, left: 22, bottom: 20, right: 22)
         root.translatesAutoresizingMaskIntoConstraints = false
-
-        root.addArrangedSubview(heading("Keyboard"))
-        commandTabButton = NSButton(
-            checkboxWithTitle: "Replace Command-Tab",
-            target: self,
-            action: #selector(commandTabChanged(_:))
-        )
-        root.addArrangedSubview(commandTabButton)
-        let shortcutHelp = NSTextField(
-            wrappingLabelWithString: "Use Command-Tab and Command-Shift-Tab to preview Host apps. " +
-                "Release Command to switch. Requires Accessibility permission."
-        )
-        shortcutHelp.textColor = .secondaryLabelColor
-        shortcutHelp.font = .systemFont(ofSize: 11)
-        shortcutHelp.preferredMaxLayoutWidth = 500
-        root.addArrangedSubview(shortcutHelp)
-        root.addArrangedSubview(separator())
 
         root.addArrangedSubview(heading("Tab bar theme"))
         themeButtons = Theme.sorted.enumerated().map { index, theme in
@@ -243,17 +225,11 @@ final class SettingsWindowController: NSWindowController {
     // MARK: - State
 
     func refresh() {
-        commandTabButton.state = CommandTabOverride.isEnabled ? .on : .off
         let theme = Theme.current
         for (index, button) in themeButtons.enumerated() {
             button.layer?.borderColor = Theme.sorted[index].id == theme.id
                 ? NSColor.controlAccentColor.cgColor : NSColor.clear.cgColor
         }
-    }
-
-    @objc private func commandTabChanged(_ sender: NSButton) {
-        CommandTabOverride.isEnabled = sender.state == .on
-        AppDelegate.shared?.registerHotKeys()
     }
 
     @objc private func themeChosen(_ sender: NSButton) {

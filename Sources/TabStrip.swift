@@ -71,7 +71,7 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
     private var buttons: [TabButton] = []
     private var recentAppIDs: [String] = []
     private var runningAppCycle = RunningAppCycle()
-    private var commandTabPreview = false
+    private var shortcutPreview = false
     private var searchField: RunningAppSearchField!
     private var searchQuery = ""
     private let searchPanel = TabStripPanel(frame: .zero, acceptsKeyboardInput: true)
@@ -186,18 +186,27 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
         buttons.removeAll()
 
         let runningApps = orderedRunningApps()
-        let labelLimit = labelLimit(for: runningApps)
-        let labelledIDs = labelledRunningAppIDs(order: recentAppIDs, limit: labelLimit)
-
-        var entries = runningApps.compactMap { app -> (id: String, name: String, icon: NSImage?)? in
-            guard let id = app.bundleIdentifier else { return nil }
-            return (id, app.localizedName ?? id, app.icon)
-        }
-        if !searchField.isHidden {
+        let searching = !searchField.isHidden
+        var entries: [(id: String, name: String, icon: NSImage?)]
+        if searching {
+            entries = runningApps.compactMap { app in
+                guard let id = app.bundleIdentifier else { return nil }
+                return (id, app.localizedName ?? id, app.icon)
+            }
             let runningIDs = Set(entries.map(\.id))
             entries += workspace.tabs.filter { !runningIDs.contains($0.bundleIdentifier) }
                 .map { ($0.bundleIdentifier, $0.name, $0.icon) }
+        } else {
+            entries = workspace.tabs.filter { WindowManager.runningApp($0.bundleIdentifier) != nil }
+                .map { ($0.bundleIdentifier, $0.name, $0.icon) }
         }
+        let available = max(120, panel.contentView?.bounds.width ?? panel.frame.width) - 114
+            - CGFloat(max(0, entries.count - 1)) * stack.spacing
+        let labelCount = fittingLabelCount(
+            widths: entries.map { Double(min(220, CGFloat($0.name.count) * 7.2 + 47)) },
+            available: Double(available)
+        )
+        let labelledIDs = Set(entries.prefix(labelCount).map(\.id))
         for app in entries {
             let id = app.id
             let name = app.name
@@ -252,30 +261,6 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
 
         cog.layer?.backgroundColor = Theme.current.chip.withAlphaComponent(0.55).cgColor
         cog.contentTintColor = Theme.current.text
-    }
-
-    /// Labels are useful when there is room, but icons keep the strip usable at
-    /// narrow window widths. Estimate each button's width and spend the available
-    /// space on the most-recently-used labels first.
-    private func labelLimit(for apps: [NSRunningApplication]) -> Int {
-        let available = max(120, panel.contentView?.bounds.width ?? panel.frame.width) - 84
-        let maximum = min(workspace.tabs.count, apps.count)
-        let labelledIDs = recentAppIDs.prefix(maximum)
-        var limit = maximum
-
-        while limit > 0 {
-            let width = apps.reduce(CGFloat(0)) { total, app in
-                guard let id = app.bundleIdentifier else { return total }
-                if labelledIDs.prefix(limit).contains(id) {
-                    let name = app.localizedName ?? id
-                    return total + min(220, CGFloat(name.count) * 7.2 + 47)
-                }
-                return total + 30
-            } + CGFloat(max(0, apps.count - 1)) * stack.spacing + 30
-            if width <= available { break }
-            limit -= 1
-        }
-        return limit
     }
 
     func toggleRunningAppSearch() {
@@ -456,13 +441,13 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
     /// icons, labels, and cards all sit behind the current app visually.
     private func applyChip(_ button: TabButton, active: Bool) {
         button.layer?.backgroundColor = Theme.current.chip.cgColor
-        button.alphaValue = commandTabPreview ? (active ? 1 : 0.22) : (active ? 1 : 0.52)
-        button.layer?.borderWidth = commandTabPreview && active ? 2 : 0
-        button.layer?.borderColor = commandTabPreview && active
+        button.alphaValue = shortcutPreview ? (active ? 1 : 0.22) : (active ? 1 : 0.52)
+        button.layer?.borderWidth = shortcutPreview && active ? 2 : 0
+        button.layer?.borderColor = shortcutPreview && active
             ? NSColor.white.withAlphaComponent(0.9).cgColor : nil
-        button.layer?.shadowColor = commandTabPreview && active ? NSColor.black.cgColor : nil
-        button.layer?.shadowOpacity = commandTabPreview && active ? 0.45 : 0
-        button.layer?.shadowRadius = commandTabPreview && active ? 8 : 0
+        button.layer?.shadowColor = shortcutPreview && active ? NSColor.black.cgColor : nil
+        button.layer?.shadowOpacity = shortcutPreview && active ? 0.45 : 0
+        button.layer?.shadowRadius = shortcutPreview && active ? 8 : 0
         button.layer?.shadowOffset = .zero
         if button.showsLabel {
             button.attributedTitle = Self.tabTitle(button.tabName, icon: button.tabIcon, active: active)
@@ -628,12 +613,12 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
 
     func previewRelative(offset: Int) {
         resumeAfterHide()
-        // Command-Tab can begin while another app is frontmost. Keep the
+        // A shortcut can begin while another app is frontmost. Keep the
         // preview strip visible above that app without activating Host itself.
         panel.level = .floating
         panel.orderFrontRegardless()
-        commandTabPreview = true
-        let liveOrder = recentAppIDs.filter { WindowManager.runningApp($0) != nil }
+        shortcutPreview = true
+        let liveOrder = workspace.tabs.map(\.bundleIdentifier).filter { WindowManager.runningApp($0) != nil }
         guard let bundleIdentifier = runningAppCycle.preview(
             liveOrder: liveOrder,
             current: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
@@ -644,7 +629,7 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
 
     func commitRunningAppCycle() {
         guard let bundleIdentifier = runningAppCycle.commit() else { return }
-        commandTabPreview = false
+        shortcutPreview = false
         selectRunningApp(bundleIdentifier: bundleIdentifier)
         highlight(bundleIdentifier)
     }
@@ -1046,7 +1031,7 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
         }
 
         // Keep the preview visible until the modifier is released.
-        guard !commandTabPreview else { return }
+        guard !shortcutPreview else { return }
         updateStripLevel(for: id)
     }
 

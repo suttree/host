@@ -82,23 +82,3 @@ struct RunningAppCycle {
         pending = nil
     }
 }
-
-/// Tracks one Command-Tab gesture without depending on AppKit or Core Graphics.
-struct CommandTabGesture {
-    private(set) var isActive = false
-
-    mutating func tabPressed(reverse: Bool) -> Int {
-        isActive = true
-        return reverse ? -1 : 1
-    }
-
-    mutating func commandChanged(isDown: Bool) -> Bool {
-        guard isActive, !isDown else { return false }
-        isActive = false
-        return true
-    }
-
-    mutating func reset() {
-        isActive = false
-    }
-}
