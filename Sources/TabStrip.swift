@@ -223,6 +223,13 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
                 styleRunningApp(button)
             }
             button.toolTip = name
+            if !searching {
+                button.onDragMoved = { [weak self] button, point in
+                    self?.dragTab(button, to: point)
+                }
+                button.onDragEnded = { [weak self] _ in self?.commitTabOrder() }
+                button.toolTip = "\(name). Drag to reorder"
+            }
 
             // Show only the action that changes this app's attachment state.
             let menu = NSMenu()
@@ -963,25 +970,22 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
         stack.insertArrangedSubview(button, at: target)
         buttons.remove(at: current)
         buttons.insert(button, at: target)
+        stack.layoutSubtreeIfNeeded()
     }
 
     /// Persist whatever order the buttons ended up in.
     private func commitTabOrder() {
-        let order = buttons.compactMap { button in
-            workspace.tabs.first { $0.bundleIdentifier == button.bundleIdentifier }
-        }
-        guard order.count == workspace.tabs.count, order != workspace.tabs else {
+        let activeID = activeIndex.map { workspace.tabs[$0].bundleIdentifier }
+        guard workspace.reorderVisibleTabs(buttons.map(\.bundleIdentifier)) else {
             rebuild()   // no change, but the live drag left the row out of step
             return
         }
-        let activeID = activeIndex.map { workspace.tabs[$0].bundleIdentifier }
-        workspace.tabs = order
         // Indices moved, so the active tab and the hotkeys must be remapped.
-        activeIndex = activeID.flatMap { id in order.firstIndex { $0.bundleIdentifier == id } }
+        activeIndex = activeID.flatMap { id in workspace.tabs.firstIndex { $0.bundleIdentifier == id } }
         Store.save(workspace)
         rebuild()
         AppDelegate.shared?.registerHotKeys()
-        Log.line("reordered: \(order.map(\.name).joined(separator: ", "))")
+        Log.line("reordered: \(workspace.tabs.map(\.name).joined(separator: ", "))")
     }
 
     /// Move a tab by index. Exists so the reorder can be exercised without a mouse.

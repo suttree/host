@@ -22,6 +22,9 @@ to the highlighted app, wrapping at either end.
 Escape to close search. Search includes running apps outside the selected set
 and saved apps that are closed. Command-Tab uses the standard macOS switcher.
 
+Drag an app's icon or name left or right to reorder the bar. Host saves the order
+between launches. Closed apps keep their saved positions.
+
 - `+` adds an app from `/Applications`, persisted to
   `~/Library/Application Support/Host/workspace.json`. The new tab is selected
   immediately, so the app launches and sizes itself to the workspace there and

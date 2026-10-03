@@ -42,6 +42,22 @@ struct Workspace: Codable {
         tabs.contains { $0.bundleIdentifier == bundleIdentifier && !$0.isDetached }
     }
 
+    /// Reorder visible apps while keeping closed apps in their saved slots.
+    @discardableResult
+    mutating func reorderVisibleTabs(_ bundleIDs: [String]) -> Bool {
+        let visibleIDs = Set(bundleIDs)
+        guard visibleIDs.count == bundleIDs.count,
+              visibleIDs.isSubset(of: Set(tabs.map(\.bundleIdentifier))) else { return false }
+        var reordered = bundleIDs.compactMap { id in tabs.first { $0.bundleIdentifier == id } }
+            .makeIterator()
+        let order = tabs.map { tab in
+            visibleIDs.contains(tab.bundleIdentifier) ? reordered.next()! : tab
+        }
+        guard order != tabs else { return false }
+        tabs = order
+        return true
+    }
+
     /// Toggle a saved tab, or remember an unsaved running app as detached.
     @discardableResult
     mutating func toggleDetached(name: String, bundleIdentifier: String) -> Bool {
