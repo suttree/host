@@ -231,15 +231,15 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
                 button.toolTip = "\(name). Drag to reorder"
             }
 
-            // Show only the action that changes this app's attachment state.
-            let menu = NSMenu()
-            let attached = workspaceIndex.map { !workspace.tabs[$0].isDetached } ?? false
-            let attachment = NSMenuItem(title: "\(attached ? "Detach" : "Attach") \(name)",
-                                        action: #selector(toggleDetached(_:)), keyEquivalent: "")
-            attachment.target = self
-            attachment.representedObject = id
-            menu.addItem(attachment)
-            button.menu = menu
+            if workspaceIndex != nil {
+                let menu = NSMenu()
+                let removal = NSMenuItem(title: "Remove \(name) from Host",
+                                         action: #selector(removeTab(_:)), keyEquivalent: "")
+                removal.target = self
+                removal.representedObject = id
+                menu.addItem(removal)
+                button.menu = menu
+            }
 
             stack.addArrangedSubview(button)
             buttons.append(button)
@@ -655,6 +655,11 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
         // suppression, hotkey index -- so two tabs for one app would fight over
         // the same state. Adding a duplicate selects the existing tab instead.
         if let existing = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) {
+            if workspace.tabs[existing].isDetached {
+                workspace.tabs[existing].isDetached = false
+                Store.save(workspace)
+                rebuild()
+            }
             Log.line("\(name) is already a tab; selecting it")
             select(index: existing)
             return
@@ -669,8 +674,8 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
     }
 
     @objc private func removeTab(_ sender: NSMenuItem) {
-        let index = sender.tag
-        guard index < workspace.tabs.count else { return }
+        guard let id = sender.representedObject as? String,
+              let index = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) else { return }
         let removed = workspace.tabs.remove(at: index)
 
         if transientHostedBundleID == removed.bundleIdentifier {
@@ -696,31 +701,6 @@ final class TabStripController: NSObject, NSWindowDelegate, NSSearchFieldDelegat
         rebuild()
         AppDelegate.shared?.registerHotKeys()
         Log.line("removed \(removed.name) -- the app is still running, window left in place")
-    }
-
-    @objc private func addRunningApp(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String,
-              let app = WindowManager.runningApp(id) else { return }
-        addTab(name: app.localizedName ?? id, bundleIdentifier: id)
-    }
-
-    @objc private func toggleDetached(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String else { return }
-        guard let index = workspace.tabs.firstIndex(where: { $0.bundleIdentifier == id }) else {
-            guard let app = WindowManager.runningApp(id) else { return }
-            addTab(name: app.localizedName ?? id, bundleIdentifier: id)
-            return
-        }
-        workspace.tabs[index].isDetached.toggle()
-        let detached = workspace.tabs[index].isDetached
-        if detached {
-            WindowManager.shared.forget(bundleID: id)
-        }
-        Store.save(workspace)
-        rebuild()
-        if !detached { select(index: index) }
-        Log.line("\(workspace.tabs[index].name) " +
-                 (detached ? "detached from" : "attached to") + " workspace")
     }
 
     // MARK: - Moving the workspace

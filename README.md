@@ -31,8 +31,9 @@ between launches. Closed apps keep their saved positions.
   then. Adding an app that is already a tab selects the existing one rather than
   creating a second — tabs are keyed by bundle id throughout, so duplicates would
   fight over the same bound window and geometry state.
-- Right-click an app and choose **Detach from Host** to let its window move and
-  resize independently. Choose **Reattach to Host** to restore shared positioning.
+- Right-click an app and choose **Remove Mail from Host**, for example, to delete
+  its saved tab and stop Host tracking its window. Mail stays open. Use `+` to add
+  it again. Adding a previously detached app attaches it to the workspace.
 - Quitting an app removes it from the visible bar but keeps its saved hosting
   preference. Launching it again restores its tab and attachment.
 - **Resizing or moving the hosted window drags the strip with it**: the strip
